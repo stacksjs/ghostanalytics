@@ -73,6 +73,15 @@ route.post('/collect', async (request: any) => {
   const path = url?.pathname ?? '/'
   const source = referrerSource(body.r)
 
+  // Ensure the site row exists before any child insert. sessions, page_views,
+  // custom_events and conversions all FK to sites.id, so a first-ever hit for a
+  // site would otherwise fail the constraint (500). insertOrIgnore self-registers
+  // the site on its first beacon and is a no-op on every hit after.
+  await db.insertOrIgnore('sites', {
+    id: String(siteId),
+    created_at: now,
+  }).catch(() => {})
+
   // Create the session on the first hit; ignore on later hits (same session id).
   await db.insertOrIgnore('sessions', {
     id: sessionId,
