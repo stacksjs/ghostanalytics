@@ -237,7 +237,7 @@ const footerGroups = [
       .nav-links a:hover { color: var(--ink); }
       .nav-cta { margin-left: 1.6rem; }
 
-      /* mobile menu — pure-CSS disclosure (details/summary), no JS */
+      /* mobile menu - pure-CSS disclosure (details/summary), no JS */
       .nav-menu { display: none; margin-left: auto; position: relative; }
       .nav-menu > summary {
         list-style: none;

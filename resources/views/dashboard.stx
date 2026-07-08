@@ -4,7 +4,7 @@
 // page always renders. Populates for real once DB_CONNECTION=singlestore points
 // at a live cluster. DB access is behind a dynamic import inside try/catch so a
 // standalone render (no DB module / no cluster) still produces the empty state.
-const meta = { title: 'ghostanalytics — Dashboard', description: 'Privacy-first web analytics' }
+const meta = { title: 'ghostanalytics - Dashboard', description: 'Privacy-first web analytics' }
 
 let siteId = (typeof request !== 'undefined' && request?.query?.site) || 'demo'
 const range = (typeof request !== 'undefined' && request?.query?.range) || '1y'
@@ -72,7 +72,7 @@ try {
   }
 }
 catch {
-  // Database not reachable yet — render the empty state.
+  // Database not reachable yet - render the empty state.
   live = false
 }
 
@@ -93,7 +93,7 @@ const kpiCards = [
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap">
 
 <style>
-/* ghostanalytics — Geist display + Geist Mono for numerics.
+/* ghostanalytics - Geist display + Geist Mono for numerics.
    One accent (emerald), off-black/off-white, auto light+dark, radius lock 12px. */
 :root {
   --bg: #fbfbfc; --panel: #ffffff; --border: rgba(15,23,42,0.08);
