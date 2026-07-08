@@ -133,6 +133,9 @@ route.post('/collect', async (request: any) => {
 
   return new Response(null, { status: 204, headers: CORS })
 })
+  // Public cross-origin, cookieless tracking beacon — no CSRF cookie can ride
+  // along (like a webhook), so opt out of the default-on CSRF check.
+  .skipCsrf()
 
 // ---------------------------------------------------------------------------
 // Stats (dashboard)
