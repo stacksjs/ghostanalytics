@@ -78,7 +78,7 @@
     "better-dx": "^0.2.15"
   },
   "overrides": {
-    "bun-query-builder": "file:./vendor/bun-query-builder"
+    "bun-query-builder": "^0.1.44"
   },
   "workspaces": [
     "storage/framework",
