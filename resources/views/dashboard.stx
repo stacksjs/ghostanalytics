@@ -27,7 +27,7 @@ let live = false
 
 // Race all DB work against a short timeout: if SingleStore isn't reachable, a
 // TCP connect can hang far longer than a render should wait, so we bail to the
-// empty state after 1.5s rather than block the page.
+// empty state after 5s rather than block the page.
 async function loadData() {
   const { db } = await import('@stacksjs/database')
   // With no explicit ?site=, land on the busiest site so the dashboard shows
@@ -81,81 +81,93 @@ const maxPage = pages.reduce((m, p) => Math.max(m, Number(p.views || 0)), 0) || 
 const maxRef = referrers.reduce((m, r) => Math.max(m, Number(r.views || 0)), 0) || 1
 
 const kpiCards = [
-  { label: 'Unique Visitors', value: kpis.visitors.toLocaleString(), icon: '👤' },
-  { label: 'Page Views', value: kpis.views.toLocaleString(), icon: '📄' },
-  { label: 'Sessions', value: kpis.sessions.toLocaleString(), icon: '🧭' },
-  { label: 'Views / Visitor', value: kpis.visitors ? (kpis.views / kpis.visitors).toFixed(1) : '0.0', icon: '📈' },
+  { label: 'Unique visitors', value: kpis.visitors.toLocaleString() },
+  { label: 'Page views', value: kpis.views.toLocaleString() },
+  { label: 'Sessions', value: kpis.sessions.toLocaleString() },
+  { label: 'Views / visitor', value: kpis.visitors ? (kpis.views / kpis.visitors).toFixed(1) : '0.0' },
 ]
 </script>
 
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap">
+
 <style>
+/* ghostanalytics — Geist display + Geist Mono for numerics.
+   One accent (emerald), off-black/off-white, auto light+dark, radius lock 12px. */
 :root {
-  --bg: #f8fafc; --panel: rgba(255,255,255,0.72); --border: rgba(15,23,42,0.08);
-  --text: #0f172a; --text-2: #475569; --text-3: #94a3b8; --accent: #6366f1; --bar: #e2e8f0;
+  --bg: #fbfbfc; --panel: #ffffff; --border: rgba(15,23,42,0.08);
+  --text: #0b1220; --text-2: #4b5563; --text-3: #98a2b3; --accent: #059669; --bar: rgba(5,150,105,0.16);
+  --sans: 'Geist', ui-sans-serif, system-ui, sans-serif;
+  --mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 @media (prefers-color-scheme: dark) {
-  :root { --bg: #0b1120; --panel: rgba(30,41,59,0.5); --border: rgba(148,163,184,0.12);
-    --text: #f1f5f9; --text-2: #cbd5e1; --text-3: #64748b; --accent: #818cf8; --bar: #1e293b; }
+  :root { --bg: #080b12; --panel: #0f131c; --border: rgba(148,163,184,0.12);
+    --text: #f2f5f9; --text-2: #b0b9c8; --text-3: #667085; --accent: #34d399; --bar: rgba(52,211,153,0.18); }
 }
-:root[data-theme="dark"] { --bg: #0b1120; --panel: rgba(30,41,59,0.5); --border: rgba(148,163,184,0.12);
-  --text: #f1f5f9; --text-2: #cbd5e1; --text-3: #64748b; --accent: #818cf8; --bar: #1e293b; }
-:root[data-theme="light"] { --bg: #f8fafc; --panel: rgba(255,255,255,0.72); --border: rgba(15,23,42,0.08);
-  --text: #0f172a; --text-2: #475569; --text-3: #94a3b8; --accent: #6366f1; --bar: #e2e8f0; }
-body { background: var(--bg); color: var(--text); font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
-.glass { background: var(--panel); border: 1px solid var(--border); backdrop-filter: blur(12px); }
-.bar-grow { animation: grow .6s ease-out; }
+:root[data-theme="dark"] { --bg: #080b12; --panel: #0f131c; --border: rgba(148,163,184,0.12);
+  --text: #f2f5f9; --text-2: #b0b9c8; --text-3: #667085; --accent: #34d399; --bar: rgba(52,211,153,0.18); }
+:root[data-theme="light"] { --bg: #fbfbfc; --panel: #ffffff; --border: rgba(15,23,42,0.08);
+  --text: #0b1220; --text-2: #4b5563; --text-3: #98a2b3; --accent: #059669; --bar: rgba(5,150,105,0.16); }
+
+body { background: var(--bg); color: var(--text); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+.mono { font-family: var(--mono); font-feature-settings: 'tnum' 1; }
+.wordmark { font-weight: 700; letter-spacing: -0.03em; }
+.panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; }
+.pill { border-radius: 999px; transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease; }
+.bar { animation: grow 0.6s cubic-bezier(0.16,1,0.3,1); transform-origin: bottom; }
 @keyframes grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+.reveal { opacity: 0; transform: translateY(10px); animation: reveal 0.5s cubic-bezier(0.16,1,0.3,1) forwards; }
+@keyframes reveal { to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .bar, .reveal { animation: none; opacity: 1; transform: none; } }
 </style>
 
-<div class="min-h-screen px-5 py-8 md:px-10">
+<div class="min-h-[100dvh] px-5 py-10 md:px-10">
   <div class="max-w-6xl mx-auto">
 
-    <header class="flex flex-wrap items-center justify-between gap-4 mb-8">
+    <header class="flex flex-wrap items-end justify-between gap-5 mb-9">
       <div>
-        <h1 class="text-2xl font-bold tracking-tight flex items-center gap-2">
-          <span>👻</span> ghostanalytics
-        </h1>
-        <p class="text-sm" style="color: var(--text-3)">Site <span class="font-mono">{{ siteId }}</span> · last {{ days }} days</p>
+        <h1 class="wordmark text-2xl md:text-[28px] leading-none">ghostanalytics</h1>
+        <p class="text-sm mt-2" style="color: var(--text-3)">
+          Site <span class="mono" style="color: var(--text-2)">{{ siteId }}</span> · last {{ days }} days
+        </p>
       </div>
-      <div class="flex items-center gap-2">
+      <nav class="flex items-center gap-1.5">
         @foreach (ranges as r)
           <a href="?site={{ siteId }}&range={{ r.key }}"
-             class="px-3 py-1.5 rounded-lg text-sm font-medium glass transition-colors"
-             style="{{ r.key === range ? 'color: var(--accent); border-color: var(--accent)' : 'color: var(--text-2)' }}">{{ r.label }}</a>
+             class="pill px-3.5 py-1.5 text-sm font-medium border"
+             style="{{ r.key === range ? 'color: #fff; background: var(--accent); border-color: var(--accent)' : 'color: var(--text-2); border-color: var(--border)' }}">{{ r.label }}</a>
         @endforeach
-      </div>
+      </nav>
     </header>
 
     @if (!live)
-      <div class="glass rounded-xl px-4 py-3 mb-6 text-sm" style="color: var(--text-2)">
-        <span class="font-semibold">Waiting for data.</span>
-        Point <span class="font-mono">DB_CONNECTION=singlestore</span> at a live cluster and drop the
-        <span class="font-mono">/script.js</span> tracker on your site — metrics appear here in real time.
+      <div class="panel px-4 py-3 mb-8 text-sm reveal" style="color: var(--text-2)">
+        <span class="font-semibold" style="color: var(--text)">Waiting for data.</span>
+        Point <span class="mono" style="color: var(--accent)">DB_CONNECTION=singlestore</span> at a live cluster and drop the
+        <span class="mono" style="color: var(--accent)">/script.js</span> tracker on your site. Metrics appear here in real time.
       </div>
     @endif
 
-    <!-- KPI cards -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <!-- KPIs: hairline-separated, mono numerics, no heavy card chrome -->
+    <div class="panel grid grid-cols-2 lg:grid-cols-4 lg:divide-x mb-6 reveal" style="border-color: var(--border)">
       @foreach (kpiCards as kpi)
-        <div class="glass rounded-xl p-5">
-          <div class="flex items-center justify-between mb-3">
-            <span class="text-xs font-medium uppercase tracking-wider" style="color: var(--text-3)">{{ kpi.label }}</span>
-            <span class="text-lg">{{ kpi.icon }}</span>
-          </div>
-          <div class="text-3xl font-bold tracking-tight">{{ kpi.value }}</div>
+        <div class="px-5 py-5" style="border-color: var(--border)">
+          <div class="text-xs font-medium uppercase tracking-wider mb-2" style="color: var(--text-3)">{{ kpi.label }}</div>
+          <div class="mono text-3xl font-semibold tracking-tight">{{ kpi.value }}</div>
         </div>
       @endforeach
     </div>
 
-    <!-- Timeseries bar chart -->
-    <div class="glass rounded-xl p-5 mb-6">
-      <h2 class="text-sm font-semibold uppercase tracking-wider mb-4" style="color: var(--text-3)">Page views over time</h2>
+    <!-- Timeseries -->
+    <div class="panel p-5 mb-6 reveal">
+      <h2 class="text-xs font-semibold uppercase tracking-wider mb-5" style="color: var(--text-3)">Page views over time</h2>
       @if (series.length)
-        <div class="flex items-end gap-1.5 h-40">
+        <div class="flex items-end gap-1 h-40">
           @foreach (series as point)
-            <div class="flex-1 flex flex-col items-center gap-1 group">
-              <div class="w-full rounded-t bar-grow" title="{{ point.day }}: {{ point.views }}"
-                   style="height: {{ Math.max(2, Math.round((Number(point.views) / maxViews) * 140)) }}px; background: var(--accent); transform-origin: bottom;"></div>
+            <div class="flex-1 group">
+              <div class="w-full rounded-t bar" title="{{ point.day }}: {{ point.views }}"
+                   style="height: {{ Math.max(2, Math.round((Number(point.views) / maxViews) * 150)) }}px; background: var(--accent);"></div>
             </div>
           @endforeach
         </div>
@@ -166,36 +178,36 @@ body { background: var(--bg); color: var(--text); font-family: ui-sans-serif, sy
 
     <div class="grid md:grid-cols-2 gap-6">
       <!-- Top pages -->
-      <div class="glass rounded-xl p-5">
-        <h2 class="text-sm font-semibold uppercase tracking-wider mb-4" style="color: var(--text-3)">Top pages</h2>
+      <div class="panel p-5 reveal">
+        <h2 class="text-xs font-semibold uppercase tracking-wider mb-4" style="color: var(--text-3)">Top pages</h2>
         @forelse (pages as p)
-          <div class="relative flex items-center justify-between py-2 text-sm">
-            <div class="absolute inset-y-1 left-0 rounded" style="width: {{ Math.round((Number(p.views) / maxPage) * 100) }}%; background: color-mix(in srgb, var(--accent) 12%, transparent);"></div>
-            <span class="relative font-mono truncate pr-2">{{ p.path }}</span>
-            <span class="relative tabular-nums font-medium">{{ Number(p.views).toLocaleString() }}</span>
+          <div class="relative flex items-center justify-between py-2.5 text-sm">
+            <div class="absolute inset-y-1 left-0 rounded" style="width: {{ Math.round((Number(p.views) / maxPage) * 100) }}%; background: var(--bar);"></div>
+            <span class="relative mono truncate pr-2" style="color: var(--text-2)">{{ p.path }}</span>
+            <span class="relative mono tabular-nums font-medium">{{ Number(p.views).toLocaleString() }}</span>
           </div>
         @empty
-          <div class="text-sm py-6 text-center" style="color: var(--text-3)">No pages yet.</div>
+          <div class="text-sm py-8 text-center" style="color: var(--text-3)">No pages yet.</div>
         @endforelse
       </div>
 
-      <!-- Top referrers -->
-      <div class="glass rounded-xl p-5">
-        <h2 class="text-sm font-semibold uppercase tracking-wider mb-4" style="color: var(--text-3)">Top sources</h2>
+      <!-- Top sources -->
+      <div class="panel p-5 reveal">
+        <h2 class="text-xs font-semibold uppercase tracking-wider mb-4" style="color: var(--text-3)">Top sources</h2>
         @forelse (referrers as r)
-          <div class="relative flex items-center justify-between py-2 text-sm">
-            <div class="absolute inset-y-1 left-0 rounded" style="width: {{ Math.round((Number(r.views) / maxRef) * 100) }}%; background: color-mix(in srgb, var(--accent) 12%, transparent);"></div>
-            <span class="relative truncate pr-2">{{ r.source }}</span>
-            <span class="relative tabular-nums font-medium">{{ Number(r.views).toLocaleString() }}</span>
+          <div class="relative flex items-center justify-between py-2.5 text-sm">
+            <div class="absolute inset-y-1 left-0 rounded" style="width: {{ Math.round((Number(r.views) / maxRef) * 100) }}%; background: var(--bar);"></div>
+            <span class="relative truncate pr-2" style="color: var(--text-2)">{{ r.source }}</span>
+            <span class="relative mono tabular-nums font-medium">{{ Number(r.views).toLocaleString() }}</span>
           </div>
         @empty
-          <div class="text-sm py-6 text-center" style="color: var(--text-3)">No sources yet.</div>
+          <div class="text-sm py-8 text-center" style="color: var(--text-3)">No sources yet.</div>
         @endforelse
       </div>
     </div>
 
-    <footer class="mt-10 text-center text-xs" style="color: var(--text-3)">
-      Privacy-first · cookieless · powered by Stacks + SingleStore
+    <footer class="mt-12 text-center text-xs" style="color: var(--text-3)">
+      Privacy-first, cookieless analytics on Stacks and SingleStore. <span class="mono">ghostanalytics.org</span>
     </footer>
 
   </div>
