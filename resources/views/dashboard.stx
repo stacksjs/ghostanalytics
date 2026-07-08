@@ -30,13 +30,13 @@ let live = false
 async function loadData() {
   const { db } = await import('@stacksjs/database')
   const p = [siteId, from, to]
-  const filter = 'site_id = $1 AND timestamp >= $2 AND timestamp <= $3'
+  const filter = 'site_id = ? AND timestamp >= ? AND timestamp <= ?'
 
   const row = (await db.unsafe(
     `SELECT COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors, COUNT(DISTINCT session_id) AS sessions FROM page_views WHERE ${filter}`, p))?.[0]
   kpis = { views: Number(row?.views ?? 0), visitors: Number(row?.visitors ?? 0), sessions: Number(row?.sessions ?? 0) }
   series = (await db.unsafe(
-    `SELECT DATE(timestamp) AS day, COUNT(*) AS views FROM page_views WHERE ${filter} GROUP BY DATE(timestamp) ORDER BY day ASC`, p)) ?? []
+    `SELECT LEFT(timestamp, 10) AS day, COUNT(*) AS views FROM page_views WHERE ${filter} GROUP BY LEFT(timestamp, 10) ORDER BY day ASC`, p)) ?? []
   pages = (await db.unsafe(
     `SELECT path, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors FROM page_views WHERE ${filter} GROUP BY path ORDER BY views DESC LIMIT 8`, p)) ?? []
   referrers = (await db.unsafe(

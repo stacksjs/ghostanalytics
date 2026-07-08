@@ -147,7 +147,7 @@ route.get('/api/sites/{siteId}/stats', async (request: any) => {
   const { from, to } = window(request)
   const row = (await db.unsafe(
     `SELECT COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors, COUNT(DISTINCT session_id) AS sessions
-     FROM page_views WHERE site_id = $1 AND timestamp >= $2 AND timestamp <= $3`,
+     FROM page_views WHERE site_id = ? AND timestamp >= ? AND timestamp <= ?`,
     [siteId, from, to],
   ))?.[0]
   return json({
@@ -162,9 +162,9 @@ route.get('/api/sites/{siteId}/timeseries', async (request: any) => {
   const siteId = request.params.siteId
   const { from, to } = window(request)
   const rows = await db.unsafe(
-    `SELECT DATE(timestamp) AS day, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors
-     FROM page_views WHERE site_id = $1 AND timestamp >= $2 AND timestamp <= $3
-     GROUP BY DATE(timestamp) ORDER BY day ASC`,
+    `SELECT LEFT(timestamp, 10) AS day, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors
+     FROM page_views WHERE site_id = ? AND timestamp >= ? AND timestamp <= ?
+     GROUP BY LEFT(timestamp, 10) ORDER BY day ASC`,
     [siteId, from, to],
   )
   return json({ series: rows ?? [] })
@@ -175,7 +175,7 @@ route.get('/api/sites/{siteId}/pages', async (request: any) => {
   const { from, to } = window(request)
   const rows = await db.unsafe(
     `SELECT path, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors
-     FROM page_views WHERE site_id = $1 AND timestamp >= $2 AND timestamp <= $3
+     FROM page_views WHERE site_id = ? AND timestamp >= ? AND timestamp <= ?
      GROUP BY path ORDER BY views DESC LIMIT 20`,
     [siteId, from, to],
   )
@@ -187,7 +187,7 @@ route.get('/api/sites/{siteId}/referrers', async (request: any) => {
   const { from, to } = window(request)
   const rows = await db.unsafe(
     `SELECT referrer_source AS source, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors
-     FROM page_views WHERE site_id = $1 AND timestamp >= $2 AND timestamp <= $3
+     FROM page_views WHERE site_id = ? AND timestamp >= ? AND timestamp <= ?
      GROUP BY referrer_source ORDER BY views DESC LIMIT 20`,
     [siteId, from, to],
   )
