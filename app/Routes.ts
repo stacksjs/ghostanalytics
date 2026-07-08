@@ -2,18 +2,19 @@
  * Route Registry
  *
  * The key becomes the URL prefix; an explicit `prefix: ''` mounts a route
- * file at the root. We spread the framework defaults (`api`, `v1`) and add
- * the ghostanalytics ingest + stats API, whose paths are already absolute
- * (`/collect`, `/health`, `/script.js`, `/api/sites/*`) so it mounts at root.
+ * file at the root. This is an analytics-only app, so we register just the
+ * ghostanalytics ingest + stats API — whose paths are already absolute
+ * (`/collect`, `/health`, `/script.js`, `/api/sites/*`) — at the root.
+ *
+ * (We intentionally do NOT spread the framework demo defaults `api`/`v1`;
+ * those scaffold route files were removed.)
  *
  * @see https://docs.stacksjs.org/routing
  */
 import type { RouteRegistry } from '@stacksjs/router'
-import defaults from '../storage/framework/defaults/app/Routes'
 
 export type { RouteDefinition, RouteRegistry } from '@stacksjs/router'
 
 export default {
-  ...defaults,
   analytics: { path: 'analytics', prefix: '' },
 } satisfies RouteRegistry
