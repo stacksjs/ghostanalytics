@@ -1,7 +1,7 @@
 # Deploying ghostanalytics
 
 ghostanalytics deploys to AWS through **ts-cloud** (`stacks buddy deploy` → `@stacksjs/ts-cloud`).
-DNS for **ghostanalytics.com** is managed at **Porkbun**.
+DNS for **ghostanalytics.org** is managed at **Porkbun**.
 
 ## Prerequisites
 
@@ -9,13 +9,13 @@ Set in `.env` (already wired locally):
 
 | Var | Purpose |
 |-----|---------|
-| `APP_DOMAIN=ghostanalytics.com` | Primary domain |
-| `SSL_DOMAINS=ghostanalytics.com,www.ghostanalytics.com` | ACM certificate SANs |
+| `APP_DOMAIN=ghostanalytics.org` | Primary domain |
+| `SSL_DOMAINS=ghostanalytics.org,www.ghostanalytics.org` | ACM certificate SANs |
 | `PORKBUN_API_KEY` / `PORKBUN_SECRET_KEY` | Porkbun DNS API (ACM validation + records) |
 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | AWS credentials |
 | `DB_CONNECTION=singlestore` + `DB_*` | SingleStore connection (managed Helios or self-hosted) |
 
-`config/cloud.ts` sets `project.name = ghostanalytics`, `dns.domain = ghostanalytics.com`, and ACM SSL.
+`config/cloud.ts` sets `project.name = ghostanalytics`, `dns.domain = ghostanalytics.org`, and ACM SSL.
 ts-cloud **auto-detects Porkbun** as the DNS provider from the domain's nameservers.
 
 ## Database

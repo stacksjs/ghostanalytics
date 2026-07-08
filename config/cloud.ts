@@ -358,7 +358,7 @@ export const tsCloud: TsCloudConfig = {
     ssl: {
       enabled: true,
       provider: 'acm', // 'acm' | 'letsencrypt'
-      domains: env.SSL_DOMAINS?.split(',') || ['ghostanalytics.com', 'www.ghostanalytics.com'],
+      domains: env.SSL_DOMAINS?.split(',') || ['ghostanalytics.org', 'www.ghostanalytics.org'],
       redirectHttp: true,
       // Porkbun manages DNS for the analytics domain. ts-cloud auto-detects the
       // provider from the domain's nameservers and reads PORKBUN_API_KEY /
@@ -377,7 +377,7 @@ export const tsCloud: TsCloudConfig = {
     dns: {
       // The analytics domain is registered + DNS-managed at Porkbun (provider
       // auto-detected by ts-cloud from nameservers + PORKBUN_* creds above).
-      domain: env.APP_DOMAIN || 'ghostanalytics.com',
+      domain: env.APP_DOMAIN || 'ghostanalytics.org',
       hostedZoneId: env.AWS_HOSTED_ZONE_ID, // only used if the domain is on Route53
     },
 
