@@ -8,7 +8,6 @@
  */
 
 import { db } from '@stacksjs/database'
-import { raw } from '@stacksjs/query-builder'
 import { response, route } from '@stacksjs/router'
 import {
   clientIp,
@@ -139,17 +138,18 @@ route.post('/collect', async (request: any) => {
 // Stats (dashboard)
 // ---------------------------------------------------------------------------
 
+// Reads go through db.unsafe (parameterized): schema-independent, correct for
+// GROUP BY aggregates, and skips the global soft-delete filter these tables
+// don't participate in. Timestamps are stored as ISO strings, whose
+// lexicographic order matches chronological order, so string range works.
 route.get('/api/sites/{siteId}/stats', async (request: any) => {
   const siteId = request.params.siteId
   const { from, to } = window(request)
-
-  const row = await db.selectFrom('page_views')
-    .selectRaw(raw`COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors, COUNT(DISTINCT session_id) AS sessions`)
-    .where('site_id', '=', siteId)
-    .where('timestamp', '>=', from)
-    .where('timestamp', '<=', to)
-    .first()
-
+  const row = (await db.unsafe(
+    `SELECT COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors, COUNT(DISTINCT session_id) AS sessions
+     FROM page_views WHERE site_id = $1 AND timestamp >= $2 AND timestamp <= $3`,
+    [siteId, from, to],
+  ))?.[0]
   return json({
     views: Number(row?.views ?? 0),
     visitors: Number(row?.visitors ?? 0),
@@ -161,50 +161,36 @@ route.get('/api/sites/{siteId}/stats', async (request: any) => {
 route.get('/api/sites/{siteId}/timeseries', async (request: any) => {
   const siteId = request.params.siteId
   const { from, to } = window(request)
-
-  const rows = await db.selectFrom('page_views')
-    .selectRaw(raw`DATE(timestamp) AS day, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors`)
-    .where('site_id', '=', siteId)
-    .where('timestamp', '>=', from)
-    .where('timestamp', '<=', to)
-    .groupByRaw(raw`DATE(timestamp)`)
-    .orderByRaw(raw`day ASC`)
-    .get()
-
+  const rows = await db.unsafe(
+    `SELECT DATE(timestamp) AS day, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors
+     FROM page_views WHERE site_id = $1 AND timestamp >= $2 AND timestamp <= $3
+     GROUP BY DATE(timestamp) ORDER BY day ASC`,
+    [siteId, from, to],
+  )
   return json({ series: rows ?? [] })
 })
 
 route.get('/api/sites/{siteId}/pages', async (request: any) => {
   const siteId = request.params.siteId
   const { from, to } = window(request)
-
-  const rows = await db.selectFrom('page_views')
-    .selectRaw(raw`path, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors`)
-    .where('site_id', '=', siteId)
-    .where('timestamp', '>=', from)
-    .where('timestamp', '<=', to)
-    .groupByRaw(raw`path`)
-    .orderByRaw(raw`views DESC`)
-    .limit(20)
-    .get()
-
+  const rows = await db.unsafe(
+    `SELECT path, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors
+     FROM page_views WHERE site_id = $1 AND timestamp >= $2 AND timestamp <= $3
+     GROUP BY path ORDER BY views DESC LIMIT 20`,
+    [siteId, from, to],
+  )
   return json({ pages: rows ?? [] })
 })
 
 route.get('/api/sites/{siteId}/referrers', async (request: any) => {
   const siteId = request.params.siteId
   const { from, to } = window(request)
-
-  const rows = await db.selectFrom('page_views')
-    .selectRaw(raw`referrer_source AS source, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors`)
-    .where('site_id', '=', siteId)
-    .where('timestamp', '>=', from)
-    .where('timestamp', '<=', to)
-    .groupByRaw(raw`referrer_source`)
-    .orderByRaw(raw`views DESC`)
-    .limit(20)
-    .get()
-
+  const rows = await db.unsafe(
+    `SELECT referrer_source AS source, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors
+     FROM page_views WHERE site_id = $1 AND timestamp >= $2 AND timestamp <= $3
+     GROUP BY referrer_source ORDER BY views DESC LIMIT 20`,
+    [siteId, from, to],
+  )
   return json({ referrers: rows ?? [] })
 })
 

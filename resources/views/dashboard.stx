@@ -29,19 +29,18 @@ let live = false
 // empty state after 1.5s rather than block the page.
 async function loadData() {
   const { db } = await import('@stacksjs/database')
-  const { raw } = await import('@stacksjs/query-builder')
-  const base = () => db.selectFrom('page_views')
-    .where('site_id', '=', siteId).where('timestamp', '>=', from).where('timestamp', '<=', to)
+  const p = [siteId, from, to]
+  const filter = 'site_id = $1 AND timestamp >= $2 AND timestamp <= $3'
 
-  const row = await base()
-    .selectRaw(raw`COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors, COUNT(DISTINCT session_id) AS sessions`).first()
+  const row = (await db.unsafe(
+    `SELECT COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors, COUNT(DISTINCT session_id) AS sessions FROM page_views WHERE ${filter}`, p))?.[0]
   kpis = { views: Number(row?.views ?? 0), visitors: Number(row?.visitors ?? 0), sessions: Number(row?.sessions ?? 0) }
-  series = (await base().selectRaw(raw`DATE(timestamp) AS day, COUNT(*) AS views`)
-    .groupByRaw(raw`DATE(timestamp)`).orderByRaw(raw`day ASC`).get()) ?? []
-  pages = (await base().selectRaw(raw`path, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors`)
-    .groupByRaw(raw`path`).orderByRaw(raw`views DESC`).limit(8).get()) ?? []
-  referrers = (await base().selectRaw(raw`referrer_source AS source, COUNT(*) AS views`)
-    .groupByRaw(raw`referrer_source`).orderByRaw(raw`views DESC`).limit(8).get()) ?? []
+  series = (await db.unsafe(
+    `SELECT DATE(timestamp) AS day, COUNT(*) AS views FROM page_views WHERE ${filter} GROUP BY DATE(timestamp) ORDER BY day ASC`, p)) ?? []
+  pages = (await db.unsafe(
+    `SELECT path, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors FROM page_views WHERE ${filter} GROUP BY path ORDER BY views DESC LIMIT 8`, p)) ?? []
+  referrers = (await db.unsafe(
+    `SELECT referrer_source AS source, COUNT(*) AS views FROM page_views WHERE ${filter} GROUP BY referrer_source ORDER BY views DESC LIMIT 8`, p)) ?? []
   live = true
 }
 
