@@ -17,10 +17,13 @@ export default defineModel({
 
   tableKind: 'reference',
 
+  hasMany: ['Subscription'],
+
   traits: {
     useAuth: {
       usePasskey: false,
     },
+    billable: true,
     useTimestamps: true,
     useApi: {
       uri: 'users',
