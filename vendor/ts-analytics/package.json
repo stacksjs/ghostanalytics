@@ -1,0 +1,9 @@
+{
+  "name": "@stacksjs/ts-analytics",
+  "version": "0.1.2",
+  "type": "module",
+  "description": "Vendored subset of @stacksjs/ts-analytics — the dependency-free /tracking primitives (verbatim source), pinned for self-contained deploys until npm publish.",
+  "exports": {
+    "./tracking": { "bun": "./tracking.ts", "import": "./tracking.ts", "types": "./tracking.ts" }
+  }
+}
