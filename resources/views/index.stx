@@ -92,36 +92,10 @@ const footerGroups = [
     <meta name="description" content="ghostanalytics is privacy-first, cookieless web analytics. Real-time visitors, sources, and conversions with no cookies, no consent banner, and no personal data. Powered by Stacks and SingleStore.">
     <meta name="theme-color" content="#0a0c0e">
     <title>ghostanalytics - Privacy-first web analytics</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap">
     <style>
-      @font-face {
-        font-display: swap;
-        font-family: "Sequoia Sans";
-        font-style: normal;
-        font-weight: 300;
-        src: url("/assets/fonts/nps/SequoiaSans-Light.woff2") format("woff2");
-      }
-      @font-face {
-        font-display: swap;
-        font-family: "Sequoia Sans";
-        font-style: normal;
-        font-weight: 400;
-        src: url("/assets/fonts/nps/SequoiaSans-Regular.woff2") format("woff2");
-      }
-      @font-face {
-        font-display: swap;
-        font-family: "Sequoia Wide";
-        font-style: normal;
-        font-weight: 400;
-        src: url("/assets/fonts/nps/SequoiaSans-Wide.woff2") format("woff2");
-      }
-      @font-face {
-        font-display: swap;
-        font-family: "Ghost Mono";
-        font-style: normal;
-        font-weight: 400;
-        src: url("/assets/fonts/Monaco.ttf") format("truetype");
-      }
-
       :root {
         color-scheme: dark;
         --void: #0a0c0e;
@@ -138,9 +112,9 @@ const footerGroups = [
         --accent-line: rgba(70, 211, 192, 0.34);
         --r: 12px;
         --r-sm: 8px;
-        --sans: "Sequoia Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
-        --wide: "Sequoia Wide", "Sequoia Sans", ui-sans-serif, system-ui, sans-serif;
-        --mono: "Ghost Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+        --sans: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
+        --wide: "Geist", ui-sans-serif, system-ui, sans-serif;
+        --mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
       }
 
       * { box-sizing: border-box; }
