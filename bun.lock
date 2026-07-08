@@ -5,6 +5,7 @@
     "": {
       "name": "stacks",
       "dependencies": {
+        "@stacksjs/ts-analytics": "link:@stacksjs/ts-analytics",
         "@stacksjs/ts-cloud": "^0.7.10",
         "@ts-cloud/aws-types": "^0.7.10",
         "@ts-cloud/core": "^0.7.10",
@@ -1214,6 +1215,8 @@
     "@stacksjs/tinker": ["@stacksjs/tinker@workspace:storage/framework/core/tinker"],
 
     "@stacksjs/tlsx": ["@stacksjs/tlsx@0.13.8", "", { "dependencies": { "@stacksjs/clapp": "^0.2.0" }, "bin": { "tlsx": "./dist/bin/cli.js" } }, "sha512-1NfW2QRPJb3J3EpxFP8qHZvqyNPLE2XpYIrj3mdp5puX3aolqgc1KjkKaCotnFe4oafuV8jhQp69iUHEQ2HzOQ=="],
+
+    "@stacksjs/ts-analytics": ["@stacksjs/ts-analytics@link:@stacksjs/ts-analytics", { "bin": { "analytics": "./bin/cli.ts" } }],
 
     "@stacksjs/ts-auth": ["@stacksjs/ts-auth@0.4.3", "", { "dependencies": { "bunfig": "^0.15.13", "ts-rate-limiter": "^0.4.1" }, "bin": { "auth": "./dist/bin/cli.js" } }, "sha512-NZRJUOzt1f5za+Bg2aGcItS+zfEpm3a70Ql8WsLwsjyYjteLOUtrxObavGGSIiDi4sz8cP114QkCHbsWjmr2tQ=="],
 

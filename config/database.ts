@@ -1,5 +1,6 @@
 import type { DatabaseConfig } from '@stacksjs/types'
 import type { SupportedDialect } from 'bun-query-builder'
+import process from 'node:process'
 import { env } from '@stacksjs/env'
 /**
  * **Database Configuration**
@@ -44,6 +45,11 @@ export default {
       username: env.DB_USERNAME || 'root',
       password: env.DB_PASSWORD || '',
       prefix: '',
+      // Managed SingleStore (Helios) requires TLS. DB_SSL isn't in the StacksEnv
+      // type yet (its DB_CONNECTION union also predates 'singlestore'), but the
+      // env Proxy reads it from process.env at runtime — read via process.env to
+      // stay type-clean. Local/self-hosted clusters can leave DB_SSL unset.
+      ssl: process.env.DB_SSL === 'true',
     },
 
     postgres: {
