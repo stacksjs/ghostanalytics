@@ -48,6 +48,7 @@
     "key:generate": "./buddy key:generate",
     "commit": "./buddy commit",
     "release": "./buddy release",
+    "release:patch": "bunx --bun bumpx patch --commit --tag --push --yes",
     "release:patch": "./buddy release --bump patch",
     "release:minor": "./buddy release --bump minor",
     "release:major": "./buddy release --bump major",
@@ -68,6 +69,7 @@
     "sqlite": "^3.47.2"
   },
   "dependencies": {
+    "@stacksjs/ts-analytics": "^0.1.2",
     "@stacksjs/ts-cloud": "^0.7.10",
     "@ts-cloud/aws-types": "^0.7.10",
     "@ts-cloud/core": "^0.7.10",
