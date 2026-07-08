@@ -3,13 +3,13 @@
  *
  * The backend-agnostic primitives — User-Agent parsing, bot filtering,
  * referrer classification, CDN geo-header extraction — come from the shared
- * `@stacksjs/ts-analytics` library (its dependency-free `/tracking` entry).
+ * dependency-free `@ts-analytics/tracking` package.
  * Only the pieces specific to *this* app live here: cookieless daily-salt
  * visitor hashing, header IP extraction, and id generation.
  */
 
 import { createHash } from 'node:crypto'
-import { getCountryFromHeaders } from '@stacksjs/ts-analytics/tracking'
+import { getCountryFromHeaders } from '@ts-analytics/tracking'
 
 // Re-export the shared primitives so route code has a single import site.
 export {
@@ -17,7 +17,7 @@ export {
   type ParsedUserAgent,
   parseUserAgent,
   parseReferrerSource as referrerSource,
-} from '@stacksjs/ts-analytics/tracking'
+} from '@ts-analytics/tracking'
 
 /**
  * Cookieless visitor id: sha256(ip + ua + siteId + daily-salt), truncated.
