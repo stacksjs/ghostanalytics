@@ -6,8 +6,11 @@
 // standalone render (no DB module / no cluster) still produces the empty state.
 const meta = { title: 'ghostanalytics - Dashboard', description: 'Privacy-first web analytics' }
 
-let siteId = (typeof request !== 'undefined' && request?.query?.site) || 'demo'
-const range = (typeof request !== 'undefined' && request?.query?.range) || '1y'
+// Query params reach server scripts via globalThis.__stxServeSearch (the serve
+// layer stashes url.search there); there is no `request.query` in stx-serve.
+const query = new URLSearchParams((typeof globalThis !== 'undefined' && globalThis.__stxServeSearch) || '')
+let siteId = query.get('site') || 'demo'
+const range = query.get('range') || '1y'
 const days = range === '30d' ? 30 : range === '90d' ? 90 : range === '1y' ? 365 : 7
 const from = new Date(Date.now() - days * 864e5).toISOString()
 const to = new Date().toISOString()
