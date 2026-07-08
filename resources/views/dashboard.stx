@@ -6,8 +6,8 @@
 // standalone render (no DB module / no cluster) still produces the empty state.
 const meta = { title: 'ghostanalytics — Dashboard', description: 'Privacy-first web analytics' }
 
-const siteId = (typeof request !== 'undefined' && request?.query?.site) || 'demo'
-const range = (typeof request !== 'undefined' && request?.query?.range) || '7d'
+let siteId = (typeof request !== 'undefined' && request?.query?.site) || 'demo'
+const range = (typeof request !== 'undefined' && request?.query?.range) || '1y'
 const days = range === '30d' ? 30 : range === '90d' ? 90 : range === '1y' ? 365 : 7
 const from = new Date(Date.now() - days * 864e5).toISOString()
 const to = new Date().toISOString()
@@ -30,6 +30,14 @@ let live = false
 // empty state after 1.5s rather than block the page.
 async function loadData() {
   const { db } = await import('@stacksjs/database')
+  // With no explicit ?site=, land on the busiest site so the dashboard shows
+  // real data out of the box (multi-tenant apps would scope this to the
+  // authenticated user's sites instead).
+  if (siteId === 'demo') {
+    const t = await db.unsafe('SELECT site_id FROM page_views GROUP BY site_id ORDER BY COUNT(*) DESC LIMIT 1')
+    if (t?.[0]?.site_id)
+      siteId = t[0].site_id
+  }
   const p = [siteId, from, to]
   const filter = 'site_id = ? AND timestamp >= ? AND timestamp <= ?'
 
