@@ -8,7 +8,7 @@ const meta = { title: 'ghostanalytics — Dashboard', description: 'Privacy-firs
 
 const siteId = (typeof request !== 'undefined' && request?.query?.site) || 'demo'
 const range = (typeof request !== 'undefined' && request?.query?.range) || '7d'
-const days = range === '30d' ? 30 : range === '90d' ? 90 : 7
+const days = range === '30d' ? 30 : range === '90d' ? 90 : range === '1y' ? 365 : 7
 const from = new Date(Date.now() - days * 864e5).toISOString()
 const to = new Date().toISOString()
 
@@ -16,6 +16,7 @@ const ranges = [
   { key: '7d', label: '7 days' },
   { key: '30d', label: '30 days' },
   { key: '90d', label: '90 days' },
+  { key: '1y', label: '1 year' },
 ]
 
 let kpis = { views: 0, visitors: 0, sessions: 0 }
@@ -45,10 +46,22 @@ async function loadData() {
 }
 
 try {
-  await Promise.race([
-    loadData(),
-    new Promise((_, reject) => setTimeout(() => reject(new Error('db timeout')), 1500)),
-  ])
+  // A host server may pre-fetch the data (e.g. when rendering in a context that
+  // can't reach the DB module) and inject it as `preloaded`; otherwise the view
+  // queries SingleStore itself.
+  if (typeof preloaded !== 'undefined' && preloaded) {
+    kpis = preloaded.kpis ?? kpis
+    series = preloaded.series ?? []
+    pages = preloaded.pages ?? []
+    referrers = preloaded.referrers ?? []
+    live = true
+  }
+  else {
+    await Promise.race([
+      loadData(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('db timeout')), 5000)),
+    ])
+  }
 }
 catch {
   // Database not reachable yet — render the empty state.
