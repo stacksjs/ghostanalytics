@@ -6,6 +6,14 @@ export default defineModel({
   table: 'sessions',
   primaryKey: 'id',
 
+  // SingleStore: append-heavy columnstore fact table. Shard on the
+  // high-cardinality id (a columnstore PK must contain the shard key), and
+  // sort on the analytics filter+range (site_id, started_at) for columnstore
+  // segment elimination on time-scoped per-site scans.
+  tableKind: 'columnstore',
+  shardKey: ['id'],
+  sortKey: ['site_id', 'started_at'],
+
   traits: {
     useTimestamps: true,
   },
