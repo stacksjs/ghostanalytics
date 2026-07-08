@@ -20,9 +20,22 @@ export default defineModel({
 
   belongsTo: ['Site', 'Session'],
 
+  // KEYS on every column the dashboard filters/groups by. On a SingleStore
+  // columnstore these become hash indexes that keep filtered breakdowns
+  // (by page, source, country, device, browser, OS) fast even at billions of
+  // rows — the same "keys on all filterable fields" strategy Fathom uses for
+  // its V3 filtering.
   indexes: [
     { name: 'pv_site_timestamp', columns: ['site_id', 'timestamp'] },
     { name: 'pv_session', columns: ['session_id'] },
+    { name: 'pv_visitor', columns: ['visitor_id'] },
+    { name: 'pv_path', columns: ['path'] },
+    { name: 'pv_referrer_source', columns: ['referrer_source'] },
+    { name: 'pv_country', columns: ['country'] },
+    { name: 'pv_device_type', columns: ['device_type'] },
+    { name: 'pv_browser', columns: ['browser'] },
+    { name: 'pv_os', columns: ['os'] },
+    { name: 'pv_utm_source', columns: ['utm_source'] },
   ],
 
   attributes: {

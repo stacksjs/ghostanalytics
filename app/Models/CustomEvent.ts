@@ -20,9 +20,13 @@ export default defineModel({
 
   belongsTo: ['Site', 'Session'],
 
+  // KEYS on the columns event breakdowns filter/group by (event name,
+  // visitor), alongside the site/time range and session join.
   indexes: [
     { name: 'ce_site_timestamp', columns: ['site_id', 'timestamp'] },
     { name: 'ce_session', columns: ['session_id'] },
+    { name: 'ce_name', columns: ['name'] },
+    { name: 'ce_visitor', columns: ['visitor_id'] },
   ],
 
   attributes: {

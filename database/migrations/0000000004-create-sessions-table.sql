@@ -22,5 +22,7 @@ CREATE TABLE IF NOT EXISTS `sessions` (
   `started_at` varchar(255),
   `ended_at` varchar(255),
   `created_at` datetime not null default CURRENT_TIMESTAMP,
-  `updated_at` datetime
+  `updated_at` datetime,
+  SHARD KEY (`id`),
+  SORT KEY (`site_id`, `started_at`)
 );

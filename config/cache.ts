@@ -1,17 +1,20 @@
 import type { CacheConfig } from '@stacksjs/types'
+import { env } from '@stacksjs/env'
 
 /**
  * **Cache Configuration**
  *
- * This configuration defines all of your cache options. Stacks cache is
- * powered by ts-cache, providing high-performance caching with support
- * for memory and Redis drivers.
+ * ghostanalytics caches on **SingleStore** rather than Redis. Following
+ * Fathom's architecture (they dropped Redis entirely once SingleStore was in
+ * place — it has plenty of free RAM and the app already talks to it), the cache
+ * lives in the same cluster as the analytics data, so there's one fewer service
+ * to run, pay for, and keep available.
  */
 export default {
   /**
-   * The cache driver to use ('memory' or 'redis')
+   * The cache driver to use ('memory' | 'redis' | 'singlestore')
    */
-  driver: 'memory',
+  driver: env.CACHE_DRIVER || 'singlestore',
 
   /**
    * Key prefix for cache namespacing
@@ -62,13 +65,13 @@ export default {
      * protocol, port 3306). Set `ssl: true` for managed SingleStore (Helios).
      */
     singlestore: {
-      host: '127.0.0.1',
-      port: 3306,
-      username: 'root',
-      password: '',
-      database: 'stacks',
-      table: 'stacks_cache',
-      ssl: false,
+      host: env.DB_HOST || '127.0.0.1',
+      port: env.DB_PORT || 3306,
+      username: env.DB_USERNAME || 'root',
+      password: env.DB_PASSWORD || '',
+      database: env.DB_DATABASE || 'ghostanalytics',
+      table: 'ghostanalytics_cache',
+      ssl: (env as Record<string, string | undefined>).DB_SSL === 'true',
     },
   },
 } satisfies CacheConfig

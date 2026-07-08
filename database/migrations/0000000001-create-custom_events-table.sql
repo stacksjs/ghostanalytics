@@ -10,5 +10,7 @@ CREATE TABLE IF NOT EXISTS `custom_events` (
   `path` varchar(255),
   `timestamp` varchar(255),
   `created_at` datetime not null default CURRENT_TIMESTAMP,
-  `updated_at` datetime
+  `updated_at` datetime,
+  SHARD KEY (`id`),
+  SORT KEY (`site_id`, `timestamp`)
 );
