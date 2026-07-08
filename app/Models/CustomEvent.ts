@@ -30,15 +30,15 @@ export default defineModel({
   ],
 
   attributes: {
-    id: { fillable: true, validation: { rule: schema.string().required() } },
-    site_id: { fillable: true, validation: { rule: schema.string().required() } },
-    session_id: { fillable: true, validation: { rule: schema.string().required() } },
-    visitor_id: { fillable: true, validation: { rule: schema.string().required() } },
-    name: { fillable: true, validation: { rule: schema.string().required() } },
-    category: { fillable: true, validation: { rule: schema.string().optional() } },
+    id: { fillable: true, validation: { rule: schema.string().required().max(64) } },
+    site_id: { fillable: true, validation: { rule: schema.string().required().max(64) } },
+    session_id: { fillable: true, validation: { rule: schema.string().required().max(64) } },
+    visitor_id: { fillable: true, validation: { rule: schema.string().required().max(64) } },
+    name: { fillable: true, validation: { rule: schema.string().required().max(128) } },
+    category: { fillable: true, validation: { rule: schema.string().optional().max(64) } },
     value: { fillable: true, validation: { rule: schema.number().optional() } },
     properties: { fillable: true, validation: { rule: schema.string().optional() } },
     path: { fillable: true, validation: { rule: schema.string().optional() } },
-    timestamp: { fillable: true, validation: { rule: schema.string().required() } },
+    timestamp: { fillable: true, validation: { rule: schema.string().required().max(32) } },
   },
 })
