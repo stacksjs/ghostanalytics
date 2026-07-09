@@ -26,6 +26,10 @@ export default {
       title: 'Dashboard - ghostanalytics',
       description: 'Real-time visitors, page views, sessions, top pages, and traffic sources for your site.',
     },
+    '/account': {
+      title: 'Account - ghostanalytics',
+      description: 'Your ghostanalytics profile, plan, and sign-in method.',
+    },
     '/use-cases': {
       title: 'Use cases - ghostanalytics',
       description: 'How SaaS teams, agencies, ecommerce stores, publishers, and open-source projects use cookieless analytics that respects visitors.',
