@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0a0c0e">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap">
+    <link rel="stylesheet" href="/marketing.css">
+  </head>
+  <body>
+    <nav class="nav">
+      <div class="nav-inner shell">
+        <a class="brand" href="/" aria-label="ghostanalytics home">
+          <span class="brand-mark">g</span>
+          <span class="brand-name">ghostanalytics</span>
+        </a>
+        <div class="nav-links" aria-label="Primary navigation">
+          <a href="/#features">Features</a>
+          <a href="/use-cases">Use cases</a>
+          <a href="/features/privacy">Privacy</a>
+          <a href="/#compare">Compare</a>
+          <a href="/docs">Docs</a>
+          <a href="https://github.com/stacksjs/ghostanalytics">GitHub</a>
+        </div>
+        <a class="btn primary sm nav-cta" href="/#install">Get your script tag</a>
+        <details class="nav-menu">
+          <summary aria-label="Open menu"><span class="burger" aria-hidden="true"></span></summary>
+          <div class="nav-menu-panel">
+            <a href="/#features">Features</a>
+            <a href="/use-cases">Use cases</a>
+            <a href="/features/privacy">Privacy</a>
+            <a href="/#compare">Compare</a>
+            <a href="/docs">Docs</a>
+            <a href="https://github.com/stacksjs/ghostanalytics">GitHub</a>
+            <a class="btn primary sm" href="/#install">Get your script tag</a>
+          </div>
+        </details>
+      </div>
+    </nav>
+
+    <main>
+      <nav class="subnav shell" aria-label="Breadcrumb">
+        <a href="/">Home</a><span class="sep">/</span>
+        <span>Use cases</span>
+      </nav>
+
+      <section class="feat-hero shell">
+        <span class="kicker">Use cases</span>
+        <h1>Real numbers for teams that respect their visitors.</h1>
+        <p>The same cookieless script fits a solo blog or a funded SaaS. Here is how different teams put ghostanalytics to work, and which features carry the weight.</p>
+        <div class="hero-actions">
+          <a class="btn primary" href="/#install">Get your script tag</a>
+          <a class="btn ghost" href="/dashboard">See a live dashboard</a>
+        </div>
+      </section>
+
+      <section class="section shell reveal" aria-label="Use cases">
+        <div class="usecases">
+
+          <article class="usecase">
+            <img src="https://picsum.photos/seed/ghost-saas-product-team/720/340" alt="A product team reviewing activation charts" width="720" height="340" loading="lazy">
+            <div class="usecase-body">
+              <h3>SaaS products</h3>
+              <p>Measure activation, trials, and upgrades with one-line goals, and see which channel earned each signup. No consent banner to scare a first-time visitor away from the form.</p>
+              <a class="textlink" href="/features/goals">Goals and campaigns</a>
+            </div>
+          </article>
+
+          <article class="usecase">
+            <img src="https://picsum.photos/seed/ghost-agency-studio-desk/720/340" alt="An agency desk with client dashboards" width="720" height="340" loading="lazy">
+            <div class="usecase-body">
+              <h3>Agencies and studios</h3>
+              <p>Give every client a clean, exact dashboard on data that stays in your own database. Shareable, honest, and free of the sampling that makes agency reports hard to defend.</p>
+              <a class="textlink" href="/features/metrics">Pageviews and sessions</a>
+            </div>
+          </article>
+
+          <article class="usecase">
+            <img src="https://picsum.photos/seed/ghost-ecommerce-storefront/720/340" alt="An online store checkout on a laptop" width="720" height="340" loading="lazy">
+            <div class="usecase-body">
+              <h3>Ecommerce</h3>
+              <p>Tie UTM campaigns to revenue with valued goals and see which source actually pays. Your customer data never flows into an ad graph you do not control.</p>
+              <a class="textlink" href="/features/sources">Sources and referrers</a>
+            </div>
+          </article>
+
+          <article class="usecase">
+            <img src="https://picsum.photos/seed/ghost-publisher-newsroom/720/340" alt="A publisher reviewing article performance" width="720" height="340" loading="lazy">
+            <div class="usecase-body">
+              <h3>Publishers and blogs</h3>
+              <p>Real reader numbers, counted exactly rather than sampled, with Core Web Vitals beside each article so a slow page never quietly loses an audience.</p>
+              <a class="textlink" href="/features/web-vitals">Core Web Vitals</a>
+            </div>
+          </article>
+
+          <article class="usecase">
+            <img src="https://picsum.photos/seed/ghost-open-source-terminal/720/340" alt="A terminal with a self-hosting command" width="720" height="340" loading="lazy">
+            <div class="usecase-body">
+              <h3>Open source and docs</h3>
+              <p>Self-host on your own infrastructure and put zero third-party trackers in front of a privacy-sensitive audience. The script is under 2 KB and the data is yours.</p>
+              <a class="textlink" href="/features/privacy">Privacy by design</a>
+            </div>
+          </article>
+
+          <article class="usecase">
+            <img src="https://picsum.photos/seed/ghost-privacy-first-brand/720/340" alt="A brand landing page with no cookie banner" width="720" height="340" loading="lazy">
+            <div class="usecase-body">
+              <h3>Privacy-first brands</h3>
+              <p>Prove the promise. No cookie, no consent theater, no personal data on the page, and analytics you can point to when a customer asks what you collect.</p>
+              <a class="textlink" href="/features/privacy">Privacy by design</a>
+            </div>
+          </article>
+
+        </div>
+      </section>
+
+      <section class="section shell reveal" aria-label="Get started">
+        <div class="cta-band">
+          <h2>Your numbers. Your visitors' privacy. Both intact.</h2>
+          <div class="cta-actions">
+            <a class="btn primary" href="/#install">Get your script tag</a>
+            <a class="btn ghost" href="/dashboard">See a live dashboard</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer shell">
+      <div class="footer-bottom" style="border-top: none">
+        <a class="brand" href="/" aria-label="ghostanalytics home">
+          <span class="brand-mark">g</span>
+          <span class="brand-name">ghostanalytics</span>
+        </a>
+        <span>No cookies. No personal data. Powered by Stacks and SingleStore.</span>
+      </div>
+    </footer>
+  </body>
+</html>

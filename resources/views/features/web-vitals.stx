@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0a0c0e">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap">
+    <link rel="stylesheet" href="/marketing.css">
+  </head>
+  <body>
+    <nav class="nav">
+      <div class="nav-inner shell">
+        <a class="brand" href="/" aria-label="ghostanalytics home">
+          <span class="brand-mark">g</span>
+          <span class="brand-name">ghostanalytics</span>
+        </a>
+        <div class="nav-links" aria-label="Primary navigation">
+            <a href="/#features">Features</a>
+            <a href="/use-cases">Use cases</a>
+            <a href="/features/privacy">Privacy</a>
+            <a href="/#compare">Compare</a>
+            <a href="/docs">Docs</a>
+            <a href="https://github.com/stacksjs/ghostanalytics">GitHub</a>
+        </div>
+        <a class="btn primary sm nav-cta" href="/#install">Get your script tag</a>
+        <details class="nav-menu">
+          <summary aria-label="Open menu"><span class="burger" aria-hidden="true"></span></summary>
+          <div class="nav-menu-panel">
+            <a href="/#features">Features</a>
+            <a href="/use-cases">Use cases</a>
+            <a href="/features/privacy">Privacy</a>
+            <a href="/#compare">Compare</a>
+            <a href="/docs">Docs</a>
+            <a href="https://github.com/stacksjs/ghostanalytics">GitHub</a>
+            <a class="btn primary sm" href="/#install">Get your script tag</a>
+          </div>
+        </details>
+      </div>
+    </nav>
+
+    <main>
+      <nav class="subnav shell" aria-label="Breadcrumb">
+        <a href="/">Home</a><span class="sep">/</span>
+        <a href="/#features">Features</a><span class="sep">/</span>
+        <span>Core Web Vitals</span>
+      </nav>
+
+      <section class="feat-hero shell">
+        <span class="kicker">Performance</span>
+        <h1>Watch speed and traffic in the same place.</h1>
+        <p>Real-user LCP, INP, and CLS collected from the same script, shown next to your traffic. A slow page shows up before it quietly costs you visitors.</p>
+        <div class="hero-actions">
+          <a class="btn primary" href="/dashboard">See a live dashboard</a>
+          <a class="btn ghost" href="/#install">Get your script tag</a>
+        </div>
+      </section>
+
+      <section class="section shell reveal" aria-label="Core Web Vitals preview">
+        <div class="vitals" style="max-width: 640px">
+          <div class="vital good">
+            <div class="vital-k">LCP</div>
+            <div class="vital-v">1.2s</div>
+            <div class="vital-tag">Good</div>
+          </div>
+          <div class="vital good">
+            <div class="vital-k">INP</div>
+            <div class="vital-v">184ms</div>
+            <div class="vital-tag">Good</div>
+          </div>
+          <div class="vital good">
+            <div class="vital-k">CLS</div>
+            <div class="vital-v">0.04</div>
+            <div class="vital-tag">Good</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section shell reveal" aria-labelledby="how-heading">
+        <div class="section-head">
+          <h2 id="how-heading" class="section-title">How it works</h2>
+        </div>
+        <div class="flow">
+          <div class="flow-step">
+            <span class="flow-num">01</span>
+            <div>
+              <h3>The browser measures the page</h3>
+              <p>The script reads the Web Vitals the browser already computes for the real people loading your pages.</p>
+            </div>
+          </div>
+          <div class="flow-step">
+            <span class="flow-num">02</span>
+            <div>
+              <h3>Field data, not a lab score</h3>
+              <p>These are 75th-percentile values from actual visitors, the same signal search engines weigh, not a synthetic test.</p>
+            </div>
+          </div>
+          <div class="flow-step">
+            <span class="flow-num">03</span>
+            <div>
+              <h3>Speed sits beside traffic</h3>
+              <p>A regression on a high-traffic page is obvious, because the vitals are one click from the pages report.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section shell reveal" aria-label="What you get">
+        <div class="metrics">
+          <div class="metric">
+            <div class="m-value">Real users</div>
+            <div class="m-label">Field measurements from actual visitors, not a lab run on one machine.</div>
+          </div>
+          <div class="metric">
+            <div class="m-value">Three core</div>
+            <div class="m-label">LCP, INP, and CLS, the metrics that decide the Core Web Vitals assessment.</div>
+          </div>
+          <div class="metric">
+            <div class="m-value">In context</div>
+            <div class="m-label">Shown next to the pages and traffic they affect, so a slow page is easy to catch.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section shell reveal" aria-labelledby="related-heading">
+        <div class="section-head">
+          <h2 id="related-heading" class="section-title">Pairs well with</h2>
+        </div>
+        <div class="related">
+          <a href="/features/metrics">
+            <div class="r-name">Pageviews and sessions</div>
+            <div class="r-desc">Find the high-traffic pages worth optimizing.</div>
+          </a>
+          <a href="/features/real-time">
+            <div class="r-name">Real-time visitors</div>
+            <div class="r-desc">Confirm a fix against live traffic.</div>
+          </a>
+          <a href="/features/geography">
+            <div class="r-name">Geography and devices</div>
+            <div class="r-desc">See where slow experiences cluster.</div>
+          </a>
+        </div>
+      </section>
+
+      <section class="section shell reveal" aria-label="Get started">
+        <div class="cta-band">
+          <h2>Your numbers. Your visitors' privacy. Both intact.</h2>
+          <div class="cta-actions">
+            <a class="btn primary" href="/#install">Get your script tag</a>
+            <a class="btn ghost" href="/dashboard">See a live dashboard</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer shell">
+      <div class="footer-bottom" style="border-top: none">
+        <a class="brand" href="/" aria-label="ghostanalytics home">
+          <span class="brand-mark">g</span>
+          <span class="brand-name">ghostanalytics</span>
+        </a>
+        <span>No cookies. No personal data. Powered by Stacks and SingleStore.</span>
+      </div>
+    </footer>
+  </body>
+</html>

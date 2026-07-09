@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0a0c0e">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap">
+    <link rel="stylesheet" href="/marketing.css">
+  </head>
+  <body>
+    <nav class="nav">
+      <div class="nav-inner shell">
+        <a class="brand" href="/" aria-label="ghostanalytics home">
+          <span class="brand-mark">g</span>
+          <span class="brand-name">ghostanalytics</span>
+        </a>
+        <div class="nav-links" aria-label="Primary navigation">
+            <a href="/#features">Features</a>
+            <a href="/use-cases">Use cases</a>
+            <a href="/features/privacy">Privacy</a>
+            <a href="/#compare">Compare</a>
+            <a href="/docs">Docs</a>
+            <a href="https://github.com/stacksjs/ghostanalytics">GitHub</a>
+        </div>
+        <a class="btn primary sm nav-cta" href="/#install">Get your script tag</a>
+        <details class="nav-menu">
+          <summary aria-label="Open menu"><span class="burger" aria-hidden="true"></span></summary>
+          <div class="nav-menu-panel">
+            <a href="/#features">Features</a>
+            <a href="/use-cases">Use cases</a>
+            <a href="/features/privacy">Privacy</a>
+            <a href="/#compare">Compare</a>
+            <a href="/docs">Docs</a>
+            <a href="https://github.com/stacksjs/ghostanalytics">GitHub</a>
+            <a class="btn primary sm" href="/#install">Get your script tag</a>
+          </div>
+        </details>
+      </div>
+    </nav>
+
+    <main>
+      <nav class="subnav shell" aria-label="Breadcrumb">
+        <a href="/">Home</a><span class="sep">/</span>
+        <a href="/#features">Features</a><span class="sep">/</span>
+        <span>Geography and devices</span>
+      </nav>
+
+      <section class="feat-hero shell">
+        <span class="kicker">Audience</span>
+        <h1>See who visits, without tracking who they are.</h1>
+        <p>Country, device, browser, and operating system, resolved at the edge. Country comes from your CDN headers, never a third-party geo-IP lookup.</p>
+        <div class="hero-actions">
+          <a class="btn primary" href="/dashboard">See a live dashboard</a>
+          <a class="btn ghost" href="/#install">Get your script tag</a>
+        </div>
+      </section>
+
+      <section class="section shell reveal" aria-label="Geography and devices preview">
+        <div class="panel" style="max-width: 640px">
+          <div class="panel-head"><span class="chart-cap">Visitors by country</span><span class="panel-tag">Sample data</span></div>
+          <div class="bar-row">
+            <span class="bar-label">United States</span>
+            <span class="bar-track"><span class="bar-fill" style="width: 100%"></span></span>
+            <span class="bar-value">38%</span>
+          </div>
+          <div class="bar-row">
+            <span class="bar-label">Germany</span>
+            <span class="bar-track"><span class="bar-fill" style="width: 45%"></span></span>
+            <span class="bar-value">17%</span>
+          </div>
+          <div class="bar-row">
+            <span class="bar-label">United Kingdom</span>
+            <span class="bar-track"><span class="bar-fill" style="width: 32%"></span></span>
+            <span class="bar-value">12%</span>
+          </div>
+          <div class="bar-row">
+            <span class="bar-label">Japan</span>
+            <span class="bar-track"><span class="bar-fill" style="width: 24%"></span></span>
+            <span class="bar-value">9%</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="section shell reveal" aria-labelledby="how-heading">
+        <div class="section-head">
+          <h2 id="how-heading" class="section-title">How it works</h2>
+        </div>
+        <div class="flow">
+          <div class="flow-step">
+            <span class="flow-num">01</span>
+            <div>
+              <h3>The edge tags the request</h3>
+              <p>Your CDN already knows the request country and passes it in a header, so no IP is stored or sent to a lookup service.</p>
+            </div>
+          </div>
+          <div class="flow-step">
+            <span class="flow-num">02</span>
+            <div>
+              <h3>The client hints the device</h3>
+              <p>Device class, browser, and OS come from the user agent on the same beacon, with nothing that identifies a person.</p>
+            </div>
+          </div>
+          <div class="flow-step">
+            <span class="flow-num">03</span>
+            <div>
+              <h3>It rolls into breakdowns</h3>
+              <p>Country, device, browser, and OS become filters you can layer on any other report.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section shell reveal" aria-label="What you get">
+        <div class="metrics">
+          <div class="metric">
+            <div class="m-value">Edge-resolved</div>
+            <div class="m-label">Country from CDN headers means no stored IP and no third-party geo service.</div>
+          </div>
+          <div class="metric">
+            <div class="m-value">Device aware</div>
+            <div class="m-label">Desktop, mobile, and tablet split, with browser and OS underneath.</div>
+          </div>
+          <div class="metric">
+            <div class="m-value">Composable</div>
+            <div class="m-label">Combine geography with any source or goal to answer a real question.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section shell reveal" aria-labelledby="related-heading">
+        <div class="section-head">
+          <h2 id="related-heading" class="section-title">Pairs well with</h2>
+        </div>
+        <div class="related">
+          <a href="/features/sources">
+            <div class="r-name">Sources and referrers</div>
+            <div class="r-desc">Cross a country with the channel it arrived from.</div>
+          </a>
+          <a href="/features/privacy">
+            <div class="r-name">Privacy by design</div>
+            <div class="r-desc">Why there is no stored IP behind these numbers.</div>
+          </a>
+          <a href="/features/real-time">
+            <div class="r-name">Real-time visitors</div>
+            <div class="r-desc">See where current visitors are right now.</div>
+          </a>
+        </div>
+      </section>
+
+      <section class="section shell reveal" aria-label="Get started">
+        <div class="cta-band">
+          <h2>Your numbers. Your visitors' privacy. Both intact.</h2>
+          <div class="cta-actions">
+            <a class="btn primary" href="/#install">Get your script tag</a>
+            <a class="btn ghost" href="/dashboard">See a live dashboard</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer shell">
+      <div class="footer-bottom" style="border-top: none">
+        <a class="brand" href="/" aria-label="ghostanalytics home">
+          <span class="brand-mark">g</span>
+          <span class="brand-name">ghostanalytics</span>
+        </a>
+        <span>No cookies. No personal data. Powered by Stacks and SingleStore.</span>
+      </div>
+    </footer>
+  </body>
+</html>

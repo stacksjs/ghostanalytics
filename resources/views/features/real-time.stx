@@ -1,0 +1,179 @@
+<script server>
+const appName = 'ghostanalytics'
+
+const meta = {
+  title: 'Real-time visitors - ghostanalytics',
+  description: 'See who is on your site right now, which pages they are reading, and where they came from. Live visitor tracking with no cookies and no reload.',
+}
+
+const navLinks = [
+  { label: 'Features', url: '/#features' },
+  { label: 'Use cases', url: '/use-cases' },
+  { label: 'Privacy', url: '/features/privacy' },
+  { label: 'Compare', url: '/#compare' },
+  { label: 'Docs', url: '/docs' },
+  { label: 'GitHub', url: 'https://github.com/stacksjs/ghostanalytics' },
+]
+
+// live sparkline (real values drive the path, no fake chrome)
+const spark = [8, 12, 10, 16, 14, 22, 19, 28, 24, 33, 30, 41, 47]
+const sMax = Math.max(...spark)
+const sparkPoints = spark
+  .map((v, i) => `${+(i * (300 / (spark.length - 1))).toFixed(1)},${+(60 - (v / sMax) * 52).toFixed(1)}`)
+  .join(' ')
+
+const flow = [
+  { n: '01', h: 'A visitor loads a page', b: 'The under-2 KB first-party script fires a single beacon. No cookie is set and nothing is written to the device.' },
+  { n: '02', h: 'The event lands in your database', b: 'The pageview is written straight to your SingleStore table with a 24-hour rotating hash standing in for identity.' },
+  { n: '03', h: 'The live view updates', b: 'Current visitors, active pages, and arrival sources refresh on their own, so the dashboard is right without a reload.' },
+]
+
+const metrics = [
+  { v: 'Live', l: 'Active-visitor and active-page counts update on their own, no manual refresh.' },
+  { v: 'Under 1s', l: 'A beacon reaches your database and the live count within a second of the pageview.' },
+  { v: 'SPA-aware', l: 'History API navigations are tracked automatically, so client-side routes count too.' },
+]
+
+const related = [
+  { slug: 'sources', name: 'Sources and referrers', desc: 'Where live visitors arrived from, classified automatically.' },
+  { slug: 'metrics', name: 'Pageviews and sessions', desc: 'How live hits roll up into sessions and bounce.' },
+  { slug: 'goals', name: 'Goals and events', desc: 'Turn a live visit into a tracked conversion.' },
+]
+</script>
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Real-time visitors - ghostanalytics</title>
+    <meta name="description" content="See who is on your site right now, which pages they are reading, and where they came from. Live visitor tracking with no cookies and no reload, powered by ghostanalytics.">
+    <meta name="theme-color" content="#0a0c0e">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap">
+    <link rel="stylesheet" href="/marketing.css">
+  </head>
+  <body>
+    <nav class="nav">
+      <div class="nav-inner shell">
+        <a class="brand" href="/" aria-label="ghostanalytics home">
+          <span class="brand-mark">g</span>
+          <span class="brand-name">{{ appName }}</span>
+        </a>
+        <div class="nav-links" aria-label="Primary navigation">
+          @foreach (navLinks as link)
+            <a href="{{ link.url }}">{{ link.label }}</a>
+          @endforeach
+        </div>
+        <a class="btn primary sm nav-cta" href="/#install">Get your script tag</a>
+        <details class="nav-menu">
+          <summary aria-label="Open menu"><span class="burger" aria-hidden="true"></span></summary>
+          <div class="nav-menu-panel">
+            @foreach (navLinks as link)
+              <a href="{{ link.url }}">{{ link.label }}</a>
+            @endforeach
+            <a class="btn primary sm" href="/#install">Get your script tag</a>
+          </div>
+        </details>
+      </div>
+    </nav>
+
+    <main>
+      <nav class="subnav shell" aria-label="Breadcrumb">
+        <a href="/">Home</a><span class="sep">/</span>
+        <a href="/#features">Features</a><span class="sep">/</span>
+        <span>Real-time visitors</span>
+      </nav>
+
+      <section class="feat-hero shell">
+        <span class="kicker">Real-time</span>
+        <h1>Watch your traffic as it happens.</h1>
+        <p>See who is on your site right now, which pages hold their attention, and where they arrived from. The live view updates on its own, with no cookie set and no reload.</p>
+        <div class="hero-actions">
+          <a class="btn primary" href="/dashboard">See a live dashboard</a>
+          <a class="btn ghost" href="/#install">Get your script tag</a>
+        </div>
+      </section>
+
+      <section class="section shell reveal" aria-label="Live preview">
+        <div class="panel" style="max-width: 640px">
+          <div class="panel-head">
+            <span class="live"><span class="live-dot" aria-hidden="true"></span>47 online now</span>
+            <span class="panel-tag">Sample data</span>
+          </div>
+          <p class="stat-big">2,847</p>
+          <p class="stat-label">visitors today</p>
+          <div class="chart-wrap">
+            <span class="chart-cap">Visitors, last hour</span>
+            <svg class="chart" viewBox="0 0 300 64" preserveAspectRatio="none" role="img" aria-label="Visitors over the last hour">
+              <polyline points="{{ sparkPoints }}" fill="none" stroke="#46d3c0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>
+            </svg>
+          </div>
+        </div>
+      </section>
+
+      <section class="section shell reveal" aria-labelledby="how-heading">
+        <div class="section-head">
+          <h2 id="how-heading" class="section-title">From pageview to live count in one beat.</h2>
+        </div>
+        <div class="flow">
+          @foreach (flow as step)
+            <div class="flow-step">
+              <span class="flow-num">{{ step.n }}</span>
+              <div>
+                <h3>{{ step.h }}</h3>
+                <p>{{ step.b }}</p>
+              </div>
+            </div>
+          @endforeach
+        </div>
+      </section>
+
+      <section class="section shell reveal" aria-label="What you get">
+        <div class="metrics">
+          @foreach (metrics as m)
+            <div class="metric">
+              <div class="m-value">{{ m.v }}</div>
+              <div class="m-label">{{ m.l }}</div>
+            </div>
+          @endforeach
+        </div>
+      </section>
+
+      <section class="section shell reveal" aria-labelledby="related-heading">
+        <div class="section-head">
+          <h2 id="related-heading" class="section-title">Pairs well with</h2>
+        </div>
+        <div class="related">
+          @foreach (related as r)
+            <a href="/features/{{ r.slug }}">
+              <div class="r-name">{{ r.name }}</div>
+              <div class="r-desc">{{ r.desc }}</div>
+            </a>
+          @endforeach
+        </div>
+      </section>
+
+      <section class="section shell reveal" aria-label="Get started">
+        <div class="cta-band">
+          <h2>Your numbers. Your visitors' privacy. Both intact.</h2>
+          <div class="cta-actions">
+            <a class="btn primary" href="/#install">Get your script tag</a>
+            <a class="btn ghost" href="/dashboard">See a live dashboard</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer shell">
+      <div class="footer-bottom" style="border-top: none">
+        <a class="brand" href="/" aria-label="ghostanalytics home">
+          <span class="brand-mark">g</span>
+          <span class="brand-name">{{ appName }}</span>
+        </a>
+        <span>No cookies. No personal data. Powered by Stacks and SingleStore.</span>
+      </div>
+    </footer>
+  </body>
+</html>
