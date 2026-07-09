@@ -24,7 +24,8 @@
             <a href="/docs">Docs</a>
             <a href="https://github.com/stacksjs/ghostanalytics">GitHub</a>
         </div>
-        <a class="btn primary sm nav-cta" href="/#install">Get your script tag</a>
+        <a class="nav-login" href="/login">Log in</a>
+        <a class="btn primary sm nav-cta" href="/register">Sign up</a>
         <details class="nav-menu">
           <summary aria-label="Open menu"><span class="burger" aria-hidden="true"></span></summary>
           <div class="nav-menu-panel">
@@ -34,7 +35,8 @@
             <a href="/#compare">Compare</a>
             <a href="/docs">Docs</a>
             <a href="https://github.com/stacksjs/ghostanalytics">GitHub</a>
-            <a class="btn primary sm" href="/#install">Get your script tag</a>
+            <a href="/login">Log in</a>
+            <a class="btn primary sm" href="/register">Sign up</a>
           </div>
         </details>
       </div>

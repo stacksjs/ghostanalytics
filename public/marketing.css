@@ -776,3 +776,8 @@
       .vital-tag { margin-top: 0.4rem; display: inline-flex; font-size: 0.78rem; color: var(--accent); }
       .vital.good .vital-tag { color: var(--accent); }
       @media (max-width: 560px) { .vitals { grid-template-columns: 1fr; } .bar-row { grid-template-columns: 110px 1fr 40px; } }
+
+      /* login link beside the Sign up nav button */
+      .nav-login { color: var(--muted); font-size: 0.9rem; transition: color 0.16s ease; }
+      .nav-login:hover { color: var(--ink); }
+      .nav-cta { margin-left: 0.95rem; }
