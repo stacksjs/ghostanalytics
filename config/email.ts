@@ -9,9 +9,13 @@ import { env } from '@stacksjs/env'
  * have any questions, feel free to reach out via Discord or GitHub Discussions.
  */
 export default {
+  // Default sender for all outbound mail. Change `address` (or set
+  // MAIL_FROM_ADDRESS) to any provisioned mailbox — e.g. hello@ghostanalytics.org
+  // — and, as long as that mailbox's MAIL_PASSWORD_<LOCALPART> is set, the SMTP
+  // driver authenticates as it automatically.
   from: {
     name: env.MAIL_FROM_NAME || 'Ghost Analytics',
-    address: env.MAIL_FROM_ADDRESS || `hello@${env.MAIL_DOMAIN || 'ghostanalytics.org'}`,
+    address: env.MAIL_FROM_ADDRESS || `noreply@${env.MAIL_DOMAIN || 'ghostanalytics.org'}`,
   },
 
   domain: env.MAIL_DOMAIN || 'ghostanalytics.org',
@@ -27,6 +31,7 @@ export default {
    * - Objects: [{ email: 'chris', password: '...' }]
    */
   mailboxes: [
+    'noreply',
     'chris',
     'hello',
   ],
