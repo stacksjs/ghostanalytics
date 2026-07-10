@@ -42,6 +42,14 @@ function window(req: { query: Record<string, any> }): { from: string, to: string
   return { from, to }
 }
 
+/** Trim a UTM param to a non-empty varchar(255), or null when absent/blank. */
+function utmParam(v: unknown): string | null {
+  if (typeof v !== 'string')
+    return null
+  const t = v.trim()
+  return t ? t.slice(0, 255) : null
+}
+
 // ---------------------------------------------------------------------------
 // Ingest
 // ---------------------------------------------------------------------------
@@ -114,6 +122,11 @@ route.post('/collect', async (request: any) => {
       title: body.t ?? null,
       referrer: body.r ?? null,
       referrer_source: source,
+      utm_source: utmParam(body.utm_source),
+      utm_medium: utmParam(body.utm_medium),
+      utm_campaign: utmParam(body.utm_campaign),
+      utm_content: utmParam(body.utm_content),
+      utm_term: utmParam(body.utm_term),
       country: country ?? null,
       device_type: info.deviceType,
       browser: info.browser,
@@ -217,8 +230,10 @@ route.get('/script.js', (request: any) => {
   if(!site)return;
   var sid=(w.crypto&&w.crypto.randomUUID?w.crypto.randomUUID():Math.random().toString(36).slice(2));
   function send(e,p){try{
-    fetch('${origin}/collect',{method:'POST',keepalive:true,headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({s:site,sid:sid,e:e,p:p||{},u:location.origin+location.pathname,r:d.referrer||'',t:d.title,sw:screen.width,sh:screen.height})});
+    var q=new URLSearchParams(location.search),
+      b={s:site,sid:sid,e:e,p:p||{},u:location.origin+location.pathname,r:d.referrer||'',t:d.title,sw:screen.width,sh:screen.height};
+    ['source','medium','campaign','content','term'].forEach(function(k){var v=q.get('utm_'+k);if(v)b['utm_'+k]=v});
+    fetch('${origin}/collect',{method:'POST',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
   }catch(_){}}
   w.ghost=function(name,props){send(name,props)};
   function pv(){send('pageview')}

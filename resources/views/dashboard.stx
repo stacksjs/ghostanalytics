@@ -33,6 +33,9 @@ let devices = []
 let browsers = []
 let systems = []
 let channelRows = []
+let campaigns = []
+let utmSources = []
+let utmMediums = []
 let bounceRate = 0
 let prevViews = 0
 let prevVisitors = 0
@@ -69,6 +72,12 @@ async function loadData() {
   // All sources (no LIMIT) so each can be folded into a channel below.
   channelRows = (await db.unsafe(
     `SELECT referrer_source AS source, COUNT(*) AS views FROM page_views WHERE ${filter} GROUP BY referrer_source`, p)) ?? []
+  campaigns = (await db.unsafe(
+    `SELECT utm_campaign AS campaign, COUNT(*) AS views FROM page_views WHERE ${filter} AND utm_campaign IS NOT NULL AND utm_campaign != '' GROUP BY utm_campaign ORDER BY views DESC LIMIT 8`, p)) ?? []
+  utmSources = (await db.unsafe(
+    `SELECT utm_source AS source, COUNT(*) AS views FROM page_views WHERE ${filter} AND utm_source IS NOT NULL AND utm_source != '' GROUP BY utm_source ORDER BY views DESC LIMIT 8`, p)) ?? []
+  utmMediums = (await db.unsafe(
+    `SELECT utm_medium AS medium, COUNT(*) AS views FROM page_views WHERE ${filter} AND utm_medium IS NOT NULL AND utm_medium != '' GROUP BY utm_medium ORDER BY views DESC LIMIT 8`, p)) ?? []
   countries = (await db.unsafe(
     `SELECT country, COUNT(*) AS views FROM page_views WHERE ${filter} AND country IS NOT NULL AND country != '' GROUP BY country ORDER BY views DESC LIMIT 8`, p)) ?? []
   devices = (await db.unsafe(
@@ -113,6 +122,9 @@ try {
     pages = preloaded.pages ?? []
     referrers = preloaded.referrers ?? []
     channelRows = preloaded.channelRows ?? []
+    campaigns = preloaded.campaigns ?? []
+    utmSources = preloaded.utmSources ?? []
+    utmMediums = preloaded.utmMediums ?? []
     countries = preloaded.countries ?? []
     devices = preloaded.devices ?? []
     browsers = preloaded.browsers ?? []
@@ -143,6 +155,9 @@ const maxCountry = countries.reduce((m, c) => Math.max(m, Number(c.views || 0)),
 const maxDevice = devices.reduce((m, d) => Math.max(m, Number(d.views || 0)), 0) || 1
 const maxBrowser = browsers.reduce((m, b) => Math.max(m, Number(b.views || 0)), 0) || 1
 const maxSystem = systems.reduce((m, s) => Math.max(m, Number(s.views || 0)), 0) || 1
+const maxCampaign = campaigns.reduce((m, c) => Math.max(m, Number(c.views || 0)), 0) || 1
+const maxUtmSource = utmSources.reduce((m, s) => Math.max(m, Number(s.views || 0)), 0) || 1
+const maxUtmMedium = utmMediums.reduce((m, u) => Math.max(m, Number(u.views || 0)), 0) || 1
 
 // Fold app-classified referrer_source strings into 4 channels, sum views, sort desc.
 const CH_SEARCH = new Set(['google', 'bing', 'duckduckgo', 'yahoo', 'baidu', 'ecosia'])
@@ -265,6 +280,9 @@ const exportPayload = {
   devices: devices.map(d => ({ device: d.device, views: Number(d.views || 0) })),
   browsers: browsers.map(b => ({ browser: b.browser, views: Number(b.views || 0) })),
   systems: systems.map(s => ({ os: s.os, views: Number(s.views || 0) })),
+  campaigns: campaigns.map(c => ({ campaign: c.campaign, views: Number(c.views || 0) })),
+  utmSources: utmSources.map(s => ({ source: s.source, views: Number(s.views || 0) })),
+  utmMediums: utmMediums.map(m => ({ medium: m.medium, views: Number(m.views || 0) })),
 }
 const exportJson = JSON.stringify(exportPayload)
 </script>
@@ -529,6 +547,50 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       @endforelse
     </div>
 
+    <!-- Campaigns (UTM): full-width Top campaigns + a 2-up grid of UTM sources / mediums -->
+    <div class="mt-6 p-5 panel reveal">
+      <h2 class="mb-4 font-semibold text-xs tracking-wider uppercase" style="color: var(--text-3)">Top campaigns</h2>
+      @forelse (campaigns as c)
+        <div class="flex relative items-center justify-between py-2.5 text-sm">
+          <div class="absolute inset-y-1 left-0 rounded" style="width: {{ Math.round((Number(c.views) / maxCampaign) * 100) }}%; background: var(--bar);"></div>
+          <span class="relative pr-2 truncate mono" style="color: var(--text-2)">{{ c.campaign }}</span>
+          <span class="relative font-medium tabular-nums mono">{{ Number(c.views).toLocaleString() }}</span>
+        </div>
+      @empty
+        <div class="py-8 text-center text-sm" style="color: var(--text-3)">No campaign data yet.</div>
+      @endforelse
+    </div>
+
+    <div class="grid gap-6 md:grid-cols-2 mt-6">
+      <!-- UTM sources -->
+      <div class="p-5 panel reveal">
+        <h2 class="mb-4 font-semibold text-xs tracking-wider uppercase" style="color: var(--text-3)">Campaign sources</h2>
+        @forelse (utmSources as s)
+          <div class="flex relative items-center justify-between py-2.5 text-sm">
+            <div class="absolute inset-y-1 left-0 rounded" style="width: {{ Math.round((Number(s.views) / maxUtmSource) * 100) }}%; background: var(--bar);"></div>
+            <span class="relative pr-2 truncate" style="color: var(--text-2)">{{ s.source }}</span>
+            <span class="relative font-medium tabular-nums mono">{{ Number(s.views).toLocaleString() }}</span>
+          </div>
+        @empty
+          <div class="py-8 text-center text-sm" style="color: var(--text-3)">No campaign source data yet.</div>
+        @endforelse
+      </div>
+
+      <!-- UTM mediums -->
+      <div class="p-5 panel reveal">
+        <h2 class="mb-4 font-semibold text-xs tracking-wider uppercase" style="color: var(--text-3)">Campaign mediums</h2>
+        @forelse (utmMediums as m)
+          <div class="flex relative items-center justify-between py-2.5 text-sm">
+            <div class="absolute inset-y-1 left-0 rounded" style="width: {{ Math.round((Number(m.views) / maxUtmMedium) * 100) }}%; background: var(--bar);"></div>
+            <span class="relative pr-2 truncate" style="color: var(--text-2)">{{ m.medium }}</span>
+            <span class="relative font-medium tabular-nums mono">{{ Number(m.views).toLocaleString() }}</span>
+          </div>
+        @empty
+          <div class="py-8 text-center text-sm" style="color: var(--text-3)">No campaign medium data yet.</div>
+        @endforelse
+      </div>
+    </div>
+
     <footer class="mt-12 text-center text-xs" style="color: var(--text-3)">
       Privacy-first, cookieless analytics on Stacks and SingleStore. <span class="mono">ghostanalytics.org</span>
     </footer>
@@ -627,6 +689,9 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       section(L, ['Device', 'Views'], data.devices, function (r) { return [r.device, r.views] })
       section(L, ['Browser', 'Views'], data.browsers, function (r) { return [r.browser, r.views] })
       section(L, ['Operating system', 'Views'], data.systems, function (r) { return [r.os, r.views] })
+      section(L, ['Campaign', 'Views'], data.campaigns, function (r) { return [r.campaign, r.views] })
+      section(L, ['UTM source', 'Views'], data.utmSources, function (r) { return [r.source, r.views] })
+      section(L, ['UTM medium', 'Views'], data.utmMediums, function (r) { return [r.medium, r.views] })
       var csv = '﻿' + L.join('\r\n')
       var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
       var url = URL.createObjectURL(blob)
