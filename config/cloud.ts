@@ -30,6 +30,10 @@ export const tsCloud: TsCloudConfig = {
   // Deploy compute to Hetzner Cloud (apiToken falls back to HCLOUD_TOKEN env).
   cloud: {
     provider: 'hetzner',
+    // Attach to the shared box owned by the `stacks` project instead of
+    // provisioning our own: the deploy resolves the `stacks-<env>-app` server,
+    // ships only ghostanalytics' site, and adds an additive rpx fragment + DNS.
+    attachTo: 'stacks',
   },
 
   /**
@@ -51,6 +55,7 @@ export const tsCloud: TsCloudConfig = {
   environments: {
     production: {
       type: 'production',
+      deployBranch: 'main',
       region: 'us-east-1',
       variables: {
         NODE_ENV: 'production',
@@ -143,6 +148,8 @@ export const tsCloud: TsCloudConfig = {
     },
     staging: {
       type: 'staging',
+      deployBranch: 'stage',
+      domainPrefix: 'staging',
       region: 'us-east-1',
       variables: {
         NODE_ENV: 'staging',
@@ -151,6 +158,8 @@ export const tsCloud: TsCloudConfig = {
     },
     development: {
       type: 'development',
+      deployBranch: 'dev',
+      domainPrefix: 'dev',
       region: 'us-east-1',
       variables: {
         NODE_ENV: 'development',
@@ -675,8 +684,11 @@ export const tsCloud: TsCloudConfig = {
       root: '.',
       path: '/',
       domain: env.APP_DOMAIN || 'ghostanalytics.org',
-      start: 'bun storage/framework/core/buddy/src/cli.ts serve',
-      port: 3000,
+      // Resolve the framework CLI from node_modules (@stacksjs/buddy) — no
+      // vendored storage/framework/core needed. Port 3024 is ghostanalytics'
+      // slot on the shared box (localhost-only; rpx fronts it by domain).
+      start: 'bun node_modules/@stacksjs/buddy/dist/cli.js serve',
+      port: 3024,
       preStart: ['bun install'],
     },
 
