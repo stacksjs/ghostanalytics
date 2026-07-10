@@ -35,43 +35,43 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
 </style>
 
 <div class="min-h-[100dvh]">
-  <header class="max-w-3xl mx-auto flex items-center justify-between px-5 md:px-6 h-16">
-    <a href="/" class="wordmark text-lg">ghostanalytics</a>
-    <div class="flex items-center gap-2.5">
-      <a href="/dashboard" class="btn btn-ghost px-3.5 py-2 text-sm">Dashboard</a>
-      <button id="logout" class="btn btn-ghost px-3.5 py-2 text-sm">Log out</button>
+  <header class="flex items-center justify-between mx-auto px-5 md:px-6 h-16 max-w-3xl">
+    <a href="/" class="text-lg wordmark">ghostanalytics</a>
+    <div class="flex gap-2.5 items-center">
+      <a href="/dashboard" class="px-3.5 py-2 text-sm btn btn-ghost">Dashboard</a>
+      <button id="logout" class="px-3.5 py-2 text-sm btn btn-ghost">Log out</button>
     </div>
   </header>
 
-  <main class="max-w-3xl mx-auto px-5 md:px-6 py-8">
-    <h1 class="wordmark text-2xl mb-6">Account</h1>
+  <main class="mx-auto px-5 py-8 md:px-6 max-w-3xl">
+    <h1 class="mb-6 text-2xl wordmark">Account</h1>
 
-    <section class="card p-6 mb-5">
-      <div class="flex items-center gap-4">
-        <img id="avatar" class="avatar w-14 h-14" alt="" width="56" height="56" style="display:none">
-        <div id="avatar-fallback" class="avatar w-14 h-14 grid place-items-center" style="color: var(--accent); font-weight: 700; font-size: 1.25rem"></div>
+    <section class="mb-5 p-6 card">
+      <div class="flex gap-4 items-center">
+        <img id="avatar" class="h-14 w-14 avatar" alt="" width="56" height="56" style="display:none">
+        <div id="avatar-fallback" class="grid place-items-center h-14 w-14 avatar" style="color: var(--accent); font-weight: 700; font-size: 1.25rem"></div>
         <div class="min-w-0">
           <div id="name" class="skeleton" style="width: 160px; height: 20px"></div>
-          <div id="email" class="text-sm mt-1.5" style="color: var(--text-2)"></div>
+          <div id="email" class="mt-1.5 text-sm" style="color: var(--text-2)"></div>
         </div>
-        <span id="provider" class="badge px-2.5 py-1 ml-auto" style="display:none"></span>
+        <span id="provider" class="ml-auto px-2.5 py-1 badge" style="display:none"></span>
       </div>
     </section>
 
-    <section class="card mb-5">
+    <section class="mb-5 card">
       <div class="flex items-center justify-between px-6 py-4">
         <div>
-          <div class="text-xs uppercase tracking-wide" style="color: var(--text-3); font-family: var(--mono)">Plan</div>
-          <div id="plan" class="text-base font-semibold mt-1">Free</div>
+          <div class="text-xs tracking-wide uppercase" style="color: var(--text-3); font-family: var(--mono)">Plan</div>
+          <div id="plan" class="mt-1 font-semibold text-base">Free</div>
         </div>
-        <a id="plan-cta" href="/pricing" class="btn btn-primary px-4 py-2 text-sm">Upgrade to Pro</a>
+        <a id="plan-cta" href="/pricing" class="px-4 py-2 text-sm btn btn-primary">Upgrade to Pro</a>
       </div>
-      <div class="row flex items-center justify-between px-6 py-4">
+      <div class="flex items-center justify-between px-6 py-4 row">
         <div>
-          <div class="text-xs uppercase tracking-wide" style="color: var(--text-3); font-family: var(--mono)">Member since</div>
-          <div id="since" class="text-base mt-1" style="color: var(--text-2)">--</div>
+          <div class="text-xs tracking-wide uppercase" style="color: var(--text-3); font-family: var(--mono)">Member since</div>
+          <div id="since" class="mt-1 text-base" style="color: var(--text-2)">--</div>
         </div>
-        <a href="/dashboard" class="btn btn-ghost px-4 py-2 text-sm">Open dashboard</a>
+        <a href="/dashboard" class="px-4 py-2 text-sm btn btn-ghost">Open dashboard</a>
       </div>
     </section>
 
@@ -111,7 +111,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       if (!d || !d.user) return
       var u = d.user
       var nameEl = document.getElementById('name')
-      nameEl.className = 'text-lg font-semibold'
+      nameEl.className = 'font-semibold text-lg'
       nameEl.style.width = 'auto'; nameEl.style.height = 'auto'
       nameEl.textContent = u.name || 'Your account'
       document.getElementById('email').textContent = u.email || ''
@@ -136,10 +136,10 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       plan.textContent = isPro ? 'Pro' : 'Free'
       var cta = document.getElementById('plan-cta')
       if (isPro) {
-        plan.className = 'text-base font-semibold mt-1'
-        plan.insertAdjacentHTML('beforeend', ' <span class="badge badge-pro px-2 py-0.5 ml-1">active</span>')
+        plan.className = 'mt-1 font-semibold text-base'
+        plan.insertAdjacentHTML('beforeend', ' <span class="ml-1 px-2 py-0.5 badge badge-pro">active</span>')
         cta.textContent = 'Manage plan'
-        cta.className = 'btn btn-ghost px-4 py-2 text-sm'
+        cta.className = 'px-4 py-2 text-sm btn btn-ghost'
       }
     })
     .catch(function () {})

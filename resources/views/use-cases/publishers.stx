@@ -24,7 +24,7 @@ const posts = [
     @include('site-nav')
 
     <main>
-      <nav class="subnav shell" aria-label="Breadcrumb">
+      <nav class="shell subnav" aria-label="Breadcrumb">
         <a href="/">Home</a><span class="sep">/</span>
         <a href="/use-cases" data-no-router>Use cases</a><span class="sep">/</span>
         <span>Publishers &amp; blogs</span>
@@ -32,18 +32,18 @@ const posts = [
 
       <section class="hero shell">
         <div>
-          <p class="eyebrow enter">For blogs &amp; publishers</p>
-          <h1 class="hero-title enter d1">Know what readers actually read.</h1>
-          <p class="hero-sub enter d2">
+          <p class="enter eyebrow">For blogs &amp; publishers</p>
+          <h1 class="d1 enter hero-title">Know what readers actually read.</h1>
+          <p class="d2 enter hero-sub">
             See your top articles, where a spike from Hacker News or Reddit came from, and how a post performs over time. All from a script under 2 KB that never slows the page down.
           </p>
-          <div class="hero-actions enter d3">
+          <div class="d3 enter hero-actions">
             <a class="btn primary" href="/#install">Get your script tag</a>
             <a class="btn ghost" href="/dashboard">See a live dashboard</a>
           </div>
         </div>
 
-        <aside class="panel enter d2" aria-label="Sample top articles">
+        <aside class="d2 enter panel" aria-label="Sample top articles">
           <div class="panel-head">
             <span class="live">Top articles, last 30 days</span>
             <span class="panel-tag">Sample data</span>
@@ -62,7 +62,7 @@ const posts = [
         </aside>
       </section>
 
-      <section class="section shell reveal" aria-label="A light script keeps pages fast">
+      <section class="reveal section shell" aria-label="A light script keeps pages fast">
         <div class="split">
           <div class="split-text">
             <h3>No ad-tech bloat weighing your pages down.</h3>
@@ -90,8 +90,8 @@ const posts = [
         </div>
       </section>
 
-      <section class="section shell reveal" aria-label="Content performance over time">
-        <div class="split rev">
+      <section class="reveal section shell" aria-label="Content performance over time">
+        <div class="rev split">
           <div class="split-text">
             <h3>Follow a post from launch-day spike to slow burn.</h3>
             <p>
@@ -118,7 +118,7 @@ const posts = [
         </div>
       </section>
 
-      <section class="section shell reveal" aria-labelledby="pub-track">
+      <section class="reveal section shell" aria-labelledby="pub-track">
         <div class="section-head">
           <h2 id="pub-track" class="section-title">What content teams watch.</h2>
           <p class="section-intro">The signals that tell you what to write next, without profiling a single reader.</p>
@@ -130,7 +130,7 @@ const posts = [
         </div>
       </section>
 
-      <section class="section shell reveal" aria-label="Get started">
+      <section class="reveal section shell" aria-label="Get started">
         <div class="cta-band">
           <h2>Write for readers, measure like it.</h2>
           <div class="cta-actions">

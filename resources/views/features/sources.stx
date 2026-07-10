@@ -13,7 +13,7 @@
     @include('site-nav')
 
     <main>
-      <nav class="subnav shell" aria-label="Breadcrumb">
+      <nav class="shell subnav" aria-label="Breadcrumb">
         <a href="/">Home</a><span class="sep">/</span>
         <a href="/#features">Features</a><span class="sep">/</span>
         <span>Sources and referrers</span>
@@ -29,7 +29,7 @@
         </div>
       </section>
 
-      <section class="section shell reveal" aria-label="Sources and referrers preview">
+      <section class="reveal section shell" aria-label="Sources and referrers preview">
         <div class="panel" style="max-width: 640px">
           <div class="panel-head"><span class="chart-cap">Traffic by channel</span><span class="panel-tag">Sample data</span></div>
           <div class="bar-row">
@@ -55,7 +55,7 @@
         </div>
       </section>
 
-      <section class="section shell reveal" aria-labelledby="how-heading">
+      <section class="reveal section shell" aria-labelledby="how-heading">
         <div class="section-head">
           <h2 id="how-heading" class="section-title">How it works</h2>
         </div>
@@ -84,7 +84,7 @@
         </div>
       </section>
 
-      <section class="section shell reveal" aria-label="What you get">
+      <section class="reveal section shell" aria-label="What you get">
         <div class="metrics">
           <div class="metric">
             <div class="m-value">Automatic</div>
@@ -101,7 +101,7 @@
         </div>
       </section>
 
-      <section class="section shell reveal" aria-labelledby="related-heading">
+      <section class="reveal section shell" aria-labelledby="related-heading">
         <div class="section-head">
           <h2 id="related-heading" class="section-title">Pairs well with</h2>
         </div>
@@ -121,7 +121,7 @@
         </div>
       </section>
 
-      <section class="section shell reveal" aria-label="Get started">
+      <section class="reveal section shell" aria-label="Get started">
         <div class="cta-band">
           <h2>Your numbers. Your visitors' privacy. Both intact.</h2>
           <div class="cta-actions">

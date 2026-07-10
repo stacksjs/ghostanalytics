@@ -1,6 +1,6 @@
 /* ghostanalytics marketing surface — shared design tokens + components.
-   Extracted from the landing so every marketing page (landing, feature
-   pages, use-cases) stays visually identical. Dark-locked, Geist, mint accent. */
+  Extracted from the landing so every marketing page (landing, feature
+  pages, use-cases) stays visually identical. Dark-locked, Geist, mint accent. */
       :root {
         color-scheme: dark;
         --void: #0a0c0e;
@@ -685,9 +685,9 @@
       }
 
       /* ============================================================
-         Feature + use-case page components (added for sub-pages).
-         Reuse the tokens above so sub-pages match the landing exactly.
-         ============================================================ */
+        Feature + use-case page components (added for sub-pages).
+        Reuse the tokens above so sub-pages match the landing exactly.
+        ============================================================ */
 
       .subnav { display: flex; align-items: center; gap: 0.5rem; padding-top: 1.75rem; color: var(--faint); font-size: 0.88rem; }
       .subnav a { color: var(--muted); transition: color 0.16s ease; }
@@ -783,9 +783,9 @@
       .nav-cta { margin-left: 0.95rem; }
 
       /* ============================================================
-         Mega-menu dropdowns (shared nav partial). CSS-only: reveal on
-         pointer hover AND keyboard focus (:focus-within), no JS.
-         ============================================================ */
+        Mega-menu dropdowns (shared nav partial). CSS-only: reveal on
+        pointer hover AND keyboard focus (:focus-within), no JS.
+        ============================================================ */
       .mega { position: relative; display: inline-flex; align-items: center; }
       .mega-trigger { display: inline-flex; align-items: center; gap: 0.34rem; cursor: pointer; transition: color 0.16s ease; }
       .mega-trigger:hover { color: var(--ink); }
@@ -837,9 +837,9 @@
       }
 
       /* ============================================================
-         Use-case page components (added for the use-case sub-pages).
-         Reuse the same tokens so the pages match the landing exactly.
-         ============================================================ */
+        Use-case page components (added for the use-case sub-pages).
+        Reuse the same tokens so the pages match the landing exactly.
+        ============================================================ */
 
       /* two-column: narrative text beside a supporting sample panel */
       .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 0.92fr); align-items: center; gap: clamp(2rem, 5vw, 4rem); }

@@ -24,7 +24,7 @@ const funnel = [
     @include('site-nav')
 
     <main>
-      <nav class="subnav shell" aria-label="Breadcrumb">
+      <nav class="shell subnav" aria-label="Breadcrumb">
         <a href="/">Home</a><span class="sep">/</span>
         <a href="/use-cases" data-no-router>Use cases</a><span class="sep">/</span>
         <span>Ecommerce</span>
@@ -32,18 +32,18 @@ const funnel = [
 
       <section class="hero shell">
         <div>
-          <p class="eyebrow enter">For ecommerce</p>
-          <h1 class="hero-title enter d1">Every order, tied to the click that earned it.</h1>
-          <p class="hero-sub enter d2">
+          <p class="enter eyebrow">For ecommerce</p>
+          <h1 class="d1 enter hero-title">Every order, tied to the click that earned it.</h1>
+          <p class="d2 enter hero-sub">
             Track carts, checkouts, and revenue without a cookie banner slowing the sale. See which products, pages, and campaigns actually pay, with numbers that match your store.
           </p>
-          <div class="hero-actions enter d3">
+          <div class="d3 enter hero-actions">
             <a class="btn primary" href="/#install">Get your script tag</a>
             <a class="btn ghost" href="/dashboard">See a live dashboard</a>
           </div>
         </div>
 
-        <aside class="panel enter d2" aria-label="Sample purchase funnel">
+        <aside class="d2 enter panel" aria-label="Sample purchase funnel">
           <div class="panel-head">
             <span class="live">Purchase funnel, last 30 days</span>
             <span class="panel-tag">Sample data</span>
@@ -62,7 +62,7 @@ const funnel = [
         </aside>
       </section>
 
-      <section class="section shell reveal" aria-label="No consent wall in checkout">
+      <section class="reveal section shell" aria-label="No consent wall in checkout">
         <div class="split">
           <div class="split-text">
             <h3>No consent wall between a shopper and the buy button.</h3>
@@ -90,8 +90,8 @@ const funnel = [
         </div>
       </section>
 
-      <section class="section shell reveal" aria-label="Revenue attribution">
-        <div class="split rev">
+      <section class="reveal section shell" aria-label="Revenue attribution">
+        <div class="rev split">
           <div class="split-text">
             <h3>Attribution that matches your revenue, not a sample.</h3>
             <p>
@@ -118,7 +118,7 @@ const funnel = [
         </div>
       </section>
 
-      <section class="section shell reveal" aria-labelledby="ecom-track">
+      <section class="reveal section shell" aria-labelledby="ecom-track">
         <div class="section-head">
           <h2 id="ecom-track" class="section-title">What stores track.</h2>
           <p class="section-intro">The moments that decide a sale, each one a single function call from your storefront.</p>
@@ -130,7 +130,7 @@ const funnel = [
         </div>
       </section>
 
-      <section class="section shell-narrow reveal" aria-labelledby="ecom-code">
+      <section class="reveal section shell-narrow" aria-labelledby="ecom-code">
         <div class="section-head">
           <h2 id="ecom-code" class="section-title">A sale is one line.</h2>
           <p class="section-intro">No SDK and no init call. Fire the order from your thank-you page with the value and any properties you want to break it down by later.</p>
@@ -148,7 +148,7 @@ const funnel = [
         <p class="code-note">The <code>ghost()</code> function ships with the tracking script, so there is nothing extra to import. Properties like <code>value</code> become breakdowns in your dashboard, and the beacon <code>POST</code>s to your own <code>/collect</code> endpoint, so even ad-blockers count the sale.</p>
       </section>
 
-      <section class="section shell reveal" aria-label="Get started">
+      <section class="reveal section shell" aria-label="Get started">
         <div class="cta-band">
           <h2>Grow revenue, not your consent overhead.</h2>
           <div class="cta-actions">

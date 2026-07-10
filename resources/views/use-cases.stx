@@ -15,7 +15,7 @@
     @include('site-nav')
 
     <main>
-      <nav class="subnav shell" aria-label="Breadcrumb">
+      <nav class="shell subnav" aria-label="Breadcrumb">
         <a href="/">Home</a><span class="sep">/</span>
         <span>Use cases</span>
       </nav>
@@ -30,7 +30,7 @@
         </div>
       </section>
 
-      <section class="section shell reveal" aria-label="Use cases">
+      <section class="reveal section shell" aria-label="Use cases">
         <div class="usecases">
 
           <a class="usecase" href="/use-cases/saas" data-no-router>
@@ -81,7 +81,7 @@
         </div>
       </section>
 
-      <section class="section shell reveal" aria-label="Get started">
+      <section class="reveal section shell" aria-label="Get started">
         <div class="cta-band">
           <h2>Your numbers. Your visitors' privacy. Both intact.</h2>
           <div class="cta-actions">

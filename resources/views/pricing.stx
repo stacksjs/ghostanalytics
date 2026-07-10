@@ -56,50 +56,50 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
 .err { color: #ef4444; }
 </style>
 
-<div class="min-h-[100dvh] px-5 py-14 md:px-10">
-  <div class="max-w-3xl mx-auto">
-    <header class="text-center mb-10">
-      <a href="/" class="wordmark text-2xl">ghostanalytics</a>
-      <h1 class="wordmark text-3xl md:text-4xl mt-6" style="letter-spacing:-0.035em">Simple, honest pricing</h1>
-      <p class="text-base mt-3" style="color: var(--text-3)">Start free. Upgrade when you outgrow it. Self-host free forever.</p>
-      <div class="seg inline-flex items-center gap-1 p-1 mt-6 text-sm">
+<div class="px-5 py-14 md:px-10 min-h-[100dvh]">
+  <div class="mx-auto max-w-3xl">
+    <header class="mb-10 text-center">
+      <a href="/" class="text-2xl wordmark">ghostanalytics</a>
+      <h1 class="mt-6 text-3xl md:text-4xl wordmark" style="letter-spacing:-0.035em">Simple, honest pricing</h1>
+      <p class="mt-3 text-base" style="color: var(--text-3)">Start free. Upgrade when you outgrow it. Self-host free forever.</p>
+      <div class="inline-flex gap-1 items-center mt-6 p-1 text-sm seg">
         <button @click="pick('monthly')" :class="interval() === 'monthly' ? 'on px-4 py-1.5 font-medium' : 'px-4 py-1.5 font-medium'">Monthly</button>
         <button @click="pick('yearly')" :class="interval() === 'yearly' ? 'on px-4 py-1.5 font-medium' : 'px-4 py-1.5 font-medium'">Yearly <span style="opacity:.8">-17%</span></button>
       </div>
     </header>
 
-    <div class="grid md:grid-cols-2 gap-5">
-      <div class="card p-7">
-        <div class="text-sm font-semibold uppercase tracking-wider" style="color: var(--text-3)">Free</div>
-        <div class="mt-3"><span class="wordmark text-4xl">\$0</span><span class="text-sm" style="color: var(--text-3)"> / forever</span></div>
-        <p class="text-sm mt-2" style="color: var(--text-2)">Everything you need to get started.</p>
+    <div class="grid gap-5 md:grid-cols-2">
+      <div class="p-7 card">
+        <div class="font-semibold text-sm tracking-wider uppercase" style="color: var(--text-3)">Free</div>
+        <div class="mt-3"><span class="text-4xl wordmark">\$0</span><span class="text-sm" style="color: var(--text-3)"> / forever</span></div>
+        <p class="mt-2 text-sm" style="color: var(--text-2)">Everything you need to get started.</p>
         <ul class="mt-6 space-y-2.5 text-sm">
-          <li class="flex items-center gap-2"><span class="check">✓</span> 1 site</li>
-          <li class="flex items-center gap-2"><span class="check">✓</span> 10k events / mo</li>
-          <li class="flex items-center gap-2"><span class="check">✓</span> 30-day retention</li>
-          <li class="flex items-center gap-2"><span class="check">✓</span> Community support</li>
+          <li class="flex gap-2 items-center"><span class="check">✓</span> 1 site</li>
+          <li class="flex gap-2 items-center"><span class="check">✓</span> 10k events / mo</li>
+          <li class="flex gap-2 items-center"><span class="check">✓</span> 30-day retention</li>
+          <li class="flex gap-2 items-center"><span class="check">✓</span> Community support</li>
         </ul>
-        <a href="/register" class="btn btn-ghost w-full block text-center py-2.5 text-sm mt-7">Get started</a>
+        <a href="/register" class="block mt-7 py-2.5 w-full text-center text-sm btn btn-ghost">Get started</a>
       </div>
 
-      <div class="card card-pro p-7">
-        <div class="text-sm font-semibold uppercase tracking-wider" style="color: var(--accent)">Pro</div>
+      <div class="p-7 card card-pro">
+        <div class="font-semibold text-sm tracking-wider uppercase" style="color: var(--accent)">Pro</div>
         <div class="mt-3">
-          <span class="wordmark text-4xl">{{ interval() === 'yearly' ? '\$190' : '\$19' }}</span><span class="text-sm" style="color: var(--text-3)">{{ interval() === 'yearly' ? ' / year' : ' / month' }}</span>
+          <span class="text-4xl wordmark">{{ interval() === 'yearly' ? '\$190' : '\$19' }}</span><span class="text-sm" style="color: var(--text-3)">{{ interval() === 'yearly' ? ' / year' : ' / month' }}</span>
         </div>
-        <p class="text-sm mt-2" style="color: var(--text-2)">For teams and sites that are growing.</p>
+        <p class="mt-2 text-sm" style="color: var(--text-2)">For teams and sites that are growing.</p>
         <ul class="mt-6 space-y-2.5 text-sm">
-          <li class="flex items-center gap-2"><span class="check">✓</span> Unlimited sites</li>
-          <li class="flex items-center gap-2"><span class="check">✓</span> Unlimited events</li>
-          <li class="flex items-center gap-2"><span class="check">✓</span> Full retention</li>
-          <li class="flex items-center gap-2"><span class="check">✓</span> Priority support</li>
+          <li class="flex gap-2 items-center"><span class="check">✓</span> Unlimited sites</li>
+          <li class="flex gap-2 items-center"><span class="check">✓</span> Unlimited events</li>
+          <li class="flex gap-2 items-center"><span class="check">✓</span> Full retention</li>
+          <li class="flex gap-2 items-center"><span class="check">✓</span> Priority support</li>
         </ul>
-        <button @click="upgrade" :disabled="loading()" class="btn btn-primary w-full py-2.5 text-sm mt-7">{{ loading() ? 'Redirecting…' : 'Upgrade to Pro' }}</button>
+        <button @click="upgrade" :disabled="loading()" class="mt-7 py-2.5 w-full text-sm btn btn-primary">{{ loading() ? 'Redirecting…' : 'Upgrade to Pro' }}</button>
         @if (err())
-          <p class="err text-xs text-center mt-3">{{ err() }}</p>
+          <p class="mt-3 text-center text-xs err">{{ err() }}</p>
         @endif
       </div>
     </div>
-    <p class="text-center text-xs mt-10" style="color: var(--text-3)">Prefer to self-host? ghostanalytics is open source and free to run yourself.</p>
+    <p class="mt-10 text-center text-xs" style="color: var(--text-3)">Prefer to self-host? ghostanalytics is open source and free to run yourself.</p>
   </div>
 </div>

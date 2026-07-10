@@ -24,7 +24,7 @@ const events = [
     @include('site-nav')
 
     <main>
-      <nav class="subnav shell" aria-label="Breadcrumb">
+      <nav class="shell subnav" aria-label="Breadcrumb">
         <a href="/">Home</a><span class="sep">/</span>
         <a href="/use-cases" data-no-router>Use cases</a><span class="sep">/</span>
         <span>Developers</span>
@@ -32,18 +32,18 @@ const events = [
 
       <section class="hero shell">
         <div>
-          <p class="eyebrow enter">For developers &amp; indie hackers</p>
-          <h1 class="hero-title enter d1">One line in, full control out.</h1>
-          <p class="hero-sub enter d2">
+          <p class="enter eyebrow">For developers &amp; indie hackers</p>
+          <h1 class="d1 enter hero-title">One line in, full control out.</h1>
+          <p class="d2 enter hero-sub">
             Drop in a single script tag, fire custom events with one function, and read it all back over a clean API. Self-hostable, SingleStore-backed, and privacy-first by default. Your data stays yours.
           </p>
-          <div class="hero-actions enter d3">
+          <div class="d3 enter hero-actions">
             <a class="btn primary" href="/#install">Get your script tag</a>
             <a class="btn ghost" href="/docs" data-no-router>Read the docs</a>
           </div>
         </div>
 
-        <aside class="panel enter d2" aria-label="Sample custom events">
+        <aside class="d2 enter panel" aria-label="Sample custom events">
           <div class="panel-head">
             <span class="live">Custom events, last 30 days</span>
             <span class="panel-tag">Sample data</span>
@@ -62,7 +62,7 @@ const events = [
         </aside>
       </section>
 
-      <section class="section shell reveal" aria-label="Own your data">
+      <section class="reveal section shell" aria-label="Own your data">
         <div class="split">
           <div class="split-text">
             <h3>Own the pipeline, not just the dashboard.</h3>
@@ -90,8 +90,8 @@ const events = [
         </div>
       </section>
 
-      <section class="section shell reveal" aria-label="Privacy first by default">
-        <div class="split rev">
+      <section class="reveal section shell" aria-label="Privacy first by default">
+        <div class="rev split">
           <div class="split-text">
             <h3>Privacy-first without writing any privacy code.</h3>
             <p>
@@ -118,7 +118,7 @@ const events = [
         </div>
       </section>
 
-      <section class="section shell-narrow reveal" aria-labelledby="dev-code">
+      <section class="reveal section shell-narrow" aria-labelledby="dev-code">
         <div class="section-head">
           <h2 id="dev-code" class="section-title">Drop it in, then send anything.</h2>
           <p class="section-intro">One tag starts pageviews. After that, any event you care about is a single call, with any properties you want to break it down by later. No SDK, no init.</p>
@@ -141,7 +141,7 @@ const events = [
         <p class="code-note">The <code>ghost()</code> function ships with the tracking script, so there is nothing extra to import. Properties become filters and breakdowns in your dashboard, the beacon <code>POST</code>s to your own <code>/collect</code> endpoint, and everything is readable back over the <code>/api</code> routes you host.</p>
       </section>
 
-      <section class="section shell reveal" aria-labelledby="dev-track">
+      <section class="reveal section shell" aria-labelledby="dev-track">
         <div class="section-head">
           <h2 id="dev-track" class="section-title">What indie builders reach for.</h2>
           <p class="section-intro">Enough to answer real product questions, none of the dashboard bloat you never open.</p>
@@ -153,7 +153,7 @@ const events = [
         </div>
       </section>
 
-      <section class="section shell reveal" aria-label="Get started">
+      <section class="reveal section shell" aria-label="Get started">
         <div class="cta-band">
           <h2>Ship analytics you actually own.</h2>
           <div class="cta-actions">

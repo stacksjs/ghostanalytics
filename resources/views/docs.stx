@@ -13,7 +13,7 @@
     @include('site-nav')
 
     <main>
-      <nav class="subnav shell" aria-label="Breadcrumb">
+      <nav class="shell subnav" aria-label="Breadcrumb">
         <a href="/">Home</a><span class="sep">/</span>
         <span>Docs</span>
       </nav>
@@ -28,7 +28,7 @@
         </div>
       </section>
 
-      <section class="section shell reveal" aria-label="Install the script">
+      <section class="reveal section shell" aria-label="Install the script">
         <div class="section-head">
           <h2 class="section-title">Install the script</h2>
           <p class="section-intro">Add one tag to your site head with your site ID. It loads deferred and first-party, and starts counting page views right away, including client-side route changes in single-page apps.</p>
@@ -41,7 +41,7 @@
         </div>
       </section>
 
-      <section class="section shell reveal" aria-label="Track custom events">
+      <section class="reveal section shell" aria-label="Track custom events">
         <div class="section-head">
           <h2 class="section-title">Track custom events</h2>
           <p class="section-intro">Once the script has loaded it puts a ghost() function on the page. Call it on any event that matters, with optional properties, to record a conversion beside your traffic.</p>
@@ -56,7 +56,7 @@ ghost('signup', {
         </div>
       </section>
 
-      <section class="section shell reveal" aria-label="Read your numbers with the API">
+      <section class="reveal section shell" aria-label="Read your numbers with the API">
         <div class="section-head">
           <h2 class="section-title">Read your numbers with the API</h2>
           <p class="section-intro">Every figure on the dashboard is available over a small read API, scoped to your site ID and an optional date range. Wire it into a status board, a scheduled report, or your own UI.</p>
@@ -75,7 +75,7 @@ fetch('https://ghostanalytics.org/api/sites/demo/stats?from=2026-07-01&amp;to=20
         </div>
       </section>
 
-      <section class="section shell reveal" aria-label="Own your data">
+      <section class="reveal section shell" aria-label="Own your data">
         <div class="section-head">
           <h2 class="section-title">Own your data, self-host if you want</h2>
           <p class="section-intro">Every event lands in your own SingleStore database, so the numbers never leave your infrastructure and there is no third party to trust. The whole stack is open source.</p>
@@ -85,7 +85,7 @@ fetch('https://ghostanalytics.org/api/sites/demo/stats?from=2026-07-01&amp;to=20
         </div>
       </section>
 
-      <section class="section shell reveal" aria-label="Get started">
+      <section class="reveal section shell" aria-label="Get started">
         <div class="cta-band">
           <h2>Start counting visitors, privately.</h2>
           <p>Add the script, watch the dashboard fill in. No cookie banner required.</p>

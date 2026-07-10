@@ -24,7 +24,7 @@ const clients = [
     @include('site-nav')
 
     <main>
-      <nav class="subnav shell" aria-label="Breadcrumb">
+      <nav class="shell subnav" aria-label="Breadcrumb">
         <a href="/">Home</a><span class="sep">/</span>
         <a href="/use-cases" data-no-router>Use cases</a><span class="sep">/</span>
         <span>Agencies</span>
@@ -32,18 +32,18 @@ const clients = [
 
       <section class="hero shell">
         <div>
-          <p class="eyebrow enter">For agencies</p>
-          <h1 class="hero-title enter d1">Every client site, one clean dashboard.</h1>
-          <p class="hero-sub enter d2">
+          <p class="enter eyebrow">For agencies</p>
+          <h1 class="d1 enter hero-title">Every client site, one clean dashboard.</h1>
+          <p class="d2 enter hero-sub">
             Add a site in seconds, track them all from one login, and share a report your client can read without a walkthrough. No per-client GA project, no consent banner to wrangle.
           </p>
-          <div class="hero-actions enter d3">
+          <div class="d3 enter hero-actions">
             <a class="btn primary" href="/#install">Get your script tag</a>
             <a class="btn ghost" href="/dashboard">See a live dashboard</a>
           </div>
         </div>
 
-        <aside class="panel enter d2" aria-label="Sample client sites">
+        <aside class="d2 enter panel" aria-label="Sample client sites">
           <div class="panel-head">
             <span class="live">Client sites, visitors this month</span>
             <span class="panel-tag">Sample data</span>
@@ -62,7 +62,7 @@ const clients = [
         </aside>
       </section>
 
-      <section class="section shell reveal" aria-label="One dashboard, every client">
+      <section class="reveal section shell" aria-label="One dashboard, every client">
         <div class="split">
           <div class="split-text">
             <h3>Stop juggling a login for every client.</h3>
@@ -90,8 +90,8 @@ const clients = [
         </div>
       </section>
 
-      <section class="section shell reveal" aria-label="Reports clients understand">
-        <div class="split rev">
+      <section class="reveal section shell" aria-label="Reports clients understand">
+        <div class="rev split">
           <div class="split-text">
             <h3>Send a report, not a login and a lesson.</h3>
             <p>
@@ -118,7 +118,7 @@ const clients = [
         </div>
       </section>
 
-      <section class="section shell reveal" aria-labelledby="agency-track">
+      <section class="reveal section shell" aria-labelledby="agency-track">
         <div class="section-head">
           <h2 id="agency-track" class="section-title">Built for the way agencies work.</h2>
           <p class="section-intro">The parts that turn analytics from a chore into a deliverable, across every account you manage.</p>
@@ -130,7 +130,7 @@ const clients = [
         </div>
       </section>
 
-      <section class="section shell reveal" aria-label="Get started">
+      <section class="reveal section shell" aria-label="Get started">
         <div class="cta-band">
           <h2>Run every client site from one place.</h2>
           <div class="cta-actions">

@@ -23,7 +23,7 @@ const funnel = [
     @include('site-nav')
 
     <main>
-      <nav class="subnav shell" aria-label="Breadcrumb">
+      <nav class="shell subnav" aria-label="Breadcrumb">
         <a href="/">Home</a><span class="sep">/</span>
         <a href="/use-cases" data-no-router>Use cases</a><span class="sep">/</span>
         <span>SaaS</span>
@@ -31,18 +31,18 @@ const funnel = [
 
       <section class="hero shell">
         <div>
-          <p class="eyebrow enter">For SaaS</p>
-          <h1 class="hero-title enter d1">From first visit to activated.</h1>
-          <p class="hero-sub enter d2">
+          <p class="enter eyebrow">For SaaS</p>
+          <h1 class="d1 enter hero-title">From first visit to activated.</h1>
+          <p class="d2 enter hero-sub">
             Track the whole SaaS funnel without a cookie banner in the way. See which pages turn visitors into signups, and which channels bring the accounts that stick.
           </p>
-          <div class="hero-actions enter d3">
+          <div class="d3 enter hero-actions">
             <a class="btn primary" href="/#install">Get your script tag</a>
             <a class="btn ghost" href="/dashboard">See a live dashboard</a>
           </div>
         </div>
 
-        <aside class="panel enter d2" aria-label="Sample signup funnel">
+        <aside class="d2 enter panel" aria-label="Sample signup funnel">
           <div class="panel-head">
             <span class="live">Signup funnel, last 30 days</span>
             <span class="panel-tag">Sample data</span>
@@ -61,7 +61,7 @@ const funnel = [
         </aside>
       </section>
 
-      <section class="section shell reveal" aria-label="No cookie tax">
+      <section class="reveal section shell" aria-label="No cookie tax">
         <div class="split">
           <div class="split-text">
             <h3>Measure the funnel without the cookie tax.</h3>
@@ -89,8 +89,8 @@ const funnel = [
         </div>
       </section>
 
-      <section class="section shell reveal" aria-label="Channel attribution">
-        <div class="split rev">
+      <section class="reveal section shell" aria-label="Channel attribution">
+        <div class="rev split">
           <div class="split-text">
             <h3>Prove which channels bring paying users.</h3>
             <p>
@@ -117,7 +117,7 @@ const funnel = [
         </div>
       </section>
 
-      <section class="section shell reveal" aria-labelledby="saas-track">
+      <section class="reveal section shell" aria-labelledby="saas-track">
         <div class="section-head">
           <h2 id="saas-track" class="section-title">What SaaS teams track.</h2>
           <p class="section-intro">The events that matter for a product-led funnel, each one a single function call.</p>
@@ -129,7 +129,7 @@ const funnel = [
         </div>
       </section>
 
-      <section class="section shell-narrow reveal" aria-labelledby="saas-code">
+      <section class="reveal section shell-narrow" aria-labelledby="saas-code">
         <div class="section-head">
           <h2 id="saas-code" class="section-title">A conversion is one line.</h2>
           <p class="section-intro">No SDK and no init call. Fire an event from anywhere in your app, with any properties you want to break it down by later.</p>
@@ -147,7 +147,7 @@ const funnel = [
         <p class="code-note">The <code>ghost()</code> function ships with the tracking script, so there is nothing extra to import. Properties become filters and breakdowns in your dashboard, and the beacon <code>POST</code>s to your own <code>/collect</code> endpoint.</p>
       </section>
 
-      <section class="section shell reveal" aria-label="Get started">
+      <section class="reveal section shell" aria-label="Get started">
         <div class="cta-band">
           <h2>Grow the funnel, not your compliance risk.</h2>
           <div class="cta-actions">

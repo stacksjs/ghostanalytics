@@ -13,7 +13,7 @@
     @include('site-nav')
 
     <main>
-      <nav class="subnav shell" aria-label="Breadcrumb">
+      <nav class="shell subnav" aria-label="Breadcrumb">
         <a href="/">Home</a><span class="sep">/</span>
         <a href="/#features">Features</a><span class="sep">/</span>
         <span>Core Web Vitals</span>
@@ -29,19 +29,19 @@
         </div>
       </section>
 
-      <section class="section shell reveal" aria-label="Core Web Vitals preview">
+      <section class="reveal section shell" aria-label="Core Web Vitals preview">
         <div class="vitals" style="max-width: 640px">
-          <div class="vital good">
+          <div class="good vital">
             <div class="vital-k">LCP</div>
             <div class="vital-v">1.2s</div>
             <div class="vital-tag">Good</div>
           </div>
-          <div class="vital good">
+          <div class="good vital">
             <div class="vital-k">INP</div>
             <div class="vital-v">184ms</div>
             <div class="vital-tag">Good</div>
           </div>
-          <div class="vital good">
+          <div class="good vital">
             <div class="vital-k">CLS</div>
             <div class="vital-v">0.04</div>
             <div class="vital-tag">Good</div>
@@ -49,7 +49,7 @@
         </div>
       </section>
 
-      <section class="section shell reveal" aria-labelledby="how-heading">
+      <section class="reveal section shell" aria-labelledby="how-heading">
         <div class="section-head">
           <h2 id="how-heading" class="section-title">How it works</h2>
         </div>
@@ -78,7 +78,7 @@
         </div>
       </section>
 
-      <section class="section shell reveal" aria-label="What you get">
+      <section class="reveal section shell" aria-label="What you get">
         <div class="metrics">
           <div class="metric">
             <div class="m-value">Real users</div>
@@ -95,7 +95,7 @@
         </div>
       </section>
 
-      <section class="section shell reveal" aria-labelledby="related-heading">
+      <section class="reveal section shell" aria-labelledby="related-heading">
         <div class="section-head">
           <h2 id="related-heading" class="section-title">Pairs well with</h2>
         </div>
@@ -115,7 +115,7 @@
         </div>
       </section>
 
-      <section class="section shell reveal" aria-label="Get started">
+      <section class="reveal section shell" aria-label="Get started">
         <div class="cta-band">
           <h2>Your numbers. Your visitors' privacy. Both intact.</h2>
           <div class="cta-actions">

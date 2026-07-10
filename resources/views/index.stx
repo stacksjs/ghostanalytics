@@ -116,18 +116,18 @@ const footerGroups = [
       <main>
         <section class="hero shell">
           <div>
-            <p class="eyebrow enter">Privacy-first web analytics</p>
-            <h1 class="hero-title enter d1">Web analytics that leaves no trace.</h1>
-            <p class="hero-sub enter d2">
+            <p class="enter eyebrow">Privacy-first web analytics</p>
+            <h1 class="d1 enter hero-title">Web analytics that leaves no trace.</h1>
+            <p class="d2 enter hero-sub">
               Real-time visitors, traffic sources, and conversions with no cookies, no consent banner, and no personal data stored. Ever.
             </p>
-            <div class="hero-actions enter d3">
+            <div class="d3 enter hero-actions">
               <a class="btn primary" href="#install">Get your script tag</a>
               <a class="btn ghost" href="/dashboard" data-no-router>See a live dashboard</a>
             </div>
           </div>
 
-          <aside class="panel enter d2" aria-label="Live analytics preview">
+          <aside class="d2 enter panel" aria-label="Live analytics preview">
             <div class="panel-head">
               <span class="live"><span class="live-dot" aria-hidden="true"></span>47 online now</span>
               <span class="panel-tag">Sample data</span>
@@ -155,7 +155,7 @@ const footerGroups = [
           </aside>
         </section>
 
-        <section id="privacy" class="section shell reveal" aria-labelledby="privacy-heading">
+        <section id="privacy" class="reveal section shell" aria-labelledby="privacy-heading">
           <div class="section-head">
             <h2 id="privacy-heading" class="section-title">Nothing to hide, because there is nothing stored.</h2>
             <p class="section-intro">The whole product is built so there is no personal data in the first place. No profiles to breach, no consent to manage, no export to negotiate.</p>
@@ -170,7 +170,7 @@ const footerGroups = [
           </div>
         </section>
 
-        <section id="features" class="section shell reveal" aria-labelledby="features-heading">
+        <section id="features" class="reveal section shell" aria-labelledby="features-heading">
           <div class="section-head">
             <h2 id="features-heading" class="section-title">Every report you actually open, in one screen.</h2>
           </div>
@@ -192,14 +192,14 @@ const footerGroups = [
           </div>
         </section>
 
-        <section class="section shell reveal" aria-label="Migrate from Google Analytics">
+        <section class="reveal section shell" aria-label="Migrate from Google Analytics">
           <div class="migrate">
             <p>Moving off Google Analytics? Import your GA history in one click and keep every chart you already track.</p>
             <a class="textlink" href="#">See the import guide</a>
           </div>
         </section>
 
-        <section id="install" class="section shell-narrow reveal" aria-labelledby="install-heading">
+        <section id="install" class="reveal section shell-narrow" aria-labelledby="install-heading">
           <div class="section-head">
             <h2 id="install-heading" class="section-title">Live in one line.</h2>
             <p class="section-intro">Drop this into your head tag. Pageviews start flowing immediately, single-page apps included, tracked automatically through the History API with no extra config.</p>
@@ -218,7 +218,7 @@ const footerGroups = [
           <p class="code-note">Track a conversion from anywhere in your app, no SDK and no init call. The script and your data live on the same host you control: beacons <code>POST</code> to <code>/collect</code> and aggregates come back from your own SingleStore database. Serve it first-party and even ad-blockers count.</p>
         </section>
 
-        <section id="compare" class="section shell reveal" aria-labelledby="compare-heading">
+        <section id="compare" class="reveal section shell" aria-labelledby="compare-heading">
           <div class="section-head">
             <p class="eyebrow">GA4 vs ghostanalytics</p>
             <h2 id="compare-heading" class="section-title">Why teams leave Google Analytics.</h2>
@@ -235,7 +235,7 @@ const footerGroups = [
           </div>
         </section>
 
-        <section class="section shell reveal" aria-label="Get started">
+        <section class="reveal section shell" aria-label="Get started">
           <div class="cta-band">
             <h2>Your numbers. Your visitors' privacy. Both intact.</h2>
             <div class="cta-actions">

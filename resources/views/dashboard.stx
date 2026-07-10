@@ -97,7 +97,7 @@ const kpiCards = [
 
 <style>
 /* ghostanalytics - Geist display + Geist Mono for numerics.
-   One accent (emerald), off-black/off-white, auto light+dark, radius lock 12px. */
+  One accent (emerald), off-black/off-white, auto light+dark, radius lock 12px. */
 :root {
   --bg: #fbfbfc; --panel: #ffffff; --border: rgba(15,23,42,0.08);
   --text: #0b1220; --text-2: #4b5563; --text-3: #98a2b3; --accent: #059669; --bar: rgba(5,150,105,0.16);
@@ -125,27 +125,27 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
 @media (prefers-reduced-motion: reduce) { .bar, .reveal { animation: none; opacity: 1; transform: none; } }
 </style>
 
-<div class="min-h-[100dvh] px-5 py-10 md:px-10">
-  <div class="max-w-6xl mx-auto">
+<div class="px-5 py-10 md:px-10 min-h-[100dvh]">
+  <div class="mx-auto max-w-6xl">
 
-    <header class="flex flex-wrap items-end justify-between gap-5 mb-9">
+    <header class="flex flex-wrap gap-5 items-end justify-between mb-9">
       <div>
-        <h1 class="wordmark text-2xl md:text-[28px] leading-none">ghostanalytics</h1>
-        <p class="text-sm mt-2" style="color: var(--text-3)">
+        <h1 class="leading-none text-2xl md:text-[28px] wordmark">ghostanalytics</h1>
+        <p class="mt-2 text-sm" style="color: var(--text-3)">
           Site <span class="mono" style="color: var(--text-2)">{{ siteId }}</span> · last {{ days }} days
         </p>
       </div>
-      <nav class="flex items-center gap-1.5">
+      <nav class="flex gap-1.5 items-center">
         @foreach (ranges as r)
           <a href="?site={{ siteId }}&range={{ r.key }}"
-             class="pill px-3.5 py-1.5 text-sm font-medium border"
-             style="{{ r.key === range ? 'color: #fff; background: var(--accent); border-color: var(--accent)' : 'color: var(--text-2); border-color: var(--border)' }}">{{ r.label }}</a>
+            class="px-3.5 py-1.5 font-medium text-sm border pill"
+            style="{{ r.key === range ? 'color: #fff; background: var(--accent); border-color: var(--accent)' : 'color: var(--text-2); border-color: var(--border)' }}">{{ r.label }}</a>
         @endforeach
       </nav>
     </header>
 
     @if (!live)
-      <div class="panel px-4 py-3 mb-8 text-sm reveal" style="color: var(--text-2)">
+      <div class="mb-8 px-4 py-3 text-sm panel reveal" style="color: var(--text-2)">
         <span class="font-semibold" style="color: var(--text)">Waiting for data.</span>
         Point <span class="mono" style="color: var(--accent)">DB_CONNECTION=singlestore</span> at a live cluster and drop the
         <span class="mono" style="color: var(--accent)">/script.js</span> tracker on your site. Metrics appear here in real time.
@@ -153,58 +153,58 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
     @endif
 
     <!-- KPIs: hairline-separated, mono numerics, no heavy card chrome -->
-    <div class="panel grid grid-cols-2 lg:grid-cols-4 lg:divide-x mb-6 reveal" style="border-color: var(--border)">
+    <div class="grid grid-cols-2 lg:grid-cols-4 mb-6 lg:divide-x panel reveal" style="border-color: var(--border)">
       @foreach (kpiCards as kpi)
         <div class="px-5 py-5" style="border-color: var(--border)">
-          <div class="text-xs font-medium uppercase tracking-wider mb-2" style="color: var(--text-3)">{{ kpi.label }}</div>
-          <div class="mono text-3xl font-semibold tracking-tight">{{ kpi.value }}</div>
+          <div class="mb-2 font-medium text-xs tracking-wider uppercase" style="color: var(--text-3)">{{ kpi.label }}</div>
+          <div class="font-semibold text-3xl tracking-tight mono">{{ kpi.value }}</div>
         </div>
       @endforeach
     </div>
 
     <!-- Timeseries -->
-    <div class="panel p-5 mb-6 reveal">
-      <h2 class="text-xs font-semibold uppercase tracking-wider mb-5" style="color: var(--text-3)">Page views over time</h2>
+    <div class="mb-6 p-5 panel reveal">
+      <h2 class="mb-5 font-semibold text-xs tracking-wider uppercase" style="color: var(--text-3)">Page views over time</h2>
       @if (series.length)
-        <div class="flex items-end gap-1 h-40">
+        <div class="flex gap-1 items-end h-40">
           @foreach (series as point)
             <div class="flex-1 group">
               <div class="w-full rounded-t bar" title="{{ point.day }}: {{ point.views }}"
-                   style="height: {{ Math.max(2, Math.round((Number(point.views) / maxViews) * 150)) }}px; background: var(--accent);"></div>
+                  style="height: {{ Math.max(2, Math.round((Number(point.views) / maxViews) * 150)) }}px; background: var(--accent);"></div>
             </div>
           @endforeach
         </div>
       @else
-        <div class="h-40 flex items-center justify-center text-sm" style="color: var(--text-3)">No page views in this range yet.</div>
+        <div class="flex items-center justify-center h-40 text-sm" style="color: var(--text-3)">No page views in this range yet.</div>
       @endif
     </div>
 
-    <div class="grid md:grid-cols-2 gap-6">
+    <div class="grid gap-6 md:grid-cols-2">
       <!-- Top pages -->
-      <div class="panel p-5 reveal">
-        <h2 class="text-xs font-semibold uppercase tracking-wider mb-4" style="color: var(--text-3)">Top pages</h2>
+      <div class="p-5 panel reveal">
+        <h2 class="mb-4 font-semibold text-xs tracking-wider uppercase" style="color: var(--text-3)">Top pages</h2>
         @forelse (pages as p)
-          <div class="relative flex items-center justify-between py-2.5 text-sm">
+          <div class="flex relative items-center justify-between py-2.5 text-sm">
             <div class="absolute inset-y-1 left-0 rounded" style="width: {{ Math.round((Number(p.views) / maxPage) * 100) }}%; background: var(--bar);"></div>
-            <span class="relative mono truncate pr-2" style="color: var(--text-2)">{{ p.path }}</span>
-            <span class="relative mono tabular-nums font-medium">{{ Number(p.views).toLocaleString() }}</span>
+            <span class="relative pr-2 truncate mono" style="color: var(--text-2)">{{ p.path }}</span>
+            <span class="relative font-medium tabular-nums mono">{{ Number(p.views).toLocaleString() }}</span>
           </div>
         @empty
-          <div class="text-sm py-8 text-center" style="color: var(--text-3)">No pages yet.</div>
+          <div class="py-8 text-center text-sm" style="color: var(--text-3)">No pages yet.</div>
         @endforelse
       </div>
 
       <!-- Top sources -->
-      <div class="panel p-5 reveal">
-        <h2 class="text-xs font-semibold uppercase tracking-wider mb-4" style="color: var(--text-3)">Top sources</h2>
+      <div class="p-5 panel reveal">
+        <h2 class="mb-4 font-semibold text-xs tracking-wider uppercase" style="color: var(--text-3)">Top sources</h2>
         @forelse (referrers as r)
-          <div class="relative flex items-center justify-between py-2.5 text-sm">
+          <div class="flex relative items-center justify-between py-2.5 text-sm">
             <div class="absolute inset-y-1 left-0 rounded" style="width: {{ Math.round((Number(r.views) / maxRef) * 100) }}%; background: var(--bar);"></div>
-            <span class="relative truncate pr-2" style="color: var(--text-2)">{{ r.source }}</span>
-            <span class="relative mono tabular-nums font-medium">{{ Number(r.views).toLocaleString() }}</span>
+            <span class="relative pr-2 truncate" style="color: var(--text-2)">{{ r.source }}</span>
+            <span class="relative font-medium tabular-nums mono">{{ Number(r.views).toLocaleString() }}</span>
           </div>
         @empty
-          <div class="text-sm py-8 text-center" style="color: var(--text-3)">No sources yet.</div>
+          <div class="py-8 text-center text-sm" style="color: var(--text-3)">No sources yet.</div>
         @endforelse
       </div>
     </div>
@@ -217,8 +217,8 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
 </div>
 
 <!-- Client auth guard: redirect to /login when there is no token, and add a
-     logout control. Plain pass-through script (stx client hydration is not
-     available on these served pages). -->
+    logout control. Plain pass-through script (stx client hydration is not
+    available on these served pages). -->
 <script>
 (function () {
   if (!localStorage.getItem('token')) { window.location.replace('/login'); return }
