@@ -28,6 +28,9 @@ let pages = []
 let referrers = []
 let countries = []
 let devices = []
+let browsers = []
+let systems = []
+let bounceRate = 0
 let live = false
 
 // Race all DB work against a short timeout: if SingleStore isn't reachable, a
@@ -59,6 +62,15 @@ async function loadData() {
     `SELECT country, COUNT(*) AS views FROM page_views WHERE ${filter} AND country IS NOT NULL AND country != '' GROUP BY country ORDER BY views DESC LIMIT 8`, p)) ?? []
   devices = (await db.unsafe(
     `SELECT device_type AS device, COUNT(*) AS views FROM page_views WHERE ${filter} AND device_type IS NOT NULL AND device_type != '' GROUP BY device_type ORDER BY views DESC LIMIT 8`, p)) ?? []
+  browsers = (await db.unsafe(
+    `SELECT browser, COUNT(*) AS views FROM page_views WHERE ${filter} AND browser IS NOT NULL AND browser != '' GROUP BY browser ORDER BY views DESC LIMIT 8`, p)) ?? []
+  systems = (await db.unsafe(
+    `SELECT os, COUNT(*) AS views FROM page_views WHERE ${filter} AND os IS NOT NULL AND os != '' GROUP BY os ORDER BY views DESC LIMIT 8`, p)) ?? []
+  // Bounce rate = share of sessions with exactly one page view (the tracker
+  // doesn't maintain sessions.is_bounce, so derive it from page_views).
+  const b = (await db.unsafe(
+    `SELECT COUNT(*) AS sessions, SUM(pv = 1) AS bounced FROM (SELECT session_id, COUNT(*) AS pv FROM page_views WHERE ${filter} GROUP BY session_id) t`, p))?.[0]
+  bounceRate = Number(b?.sessions) ? Math.round((Number(b.bounced) / Number(b.sessions)) * 100) : 0
   live = true
 }
 
@@ -73,6 +85,9 @@ try {
     referrers = preloaded.referrers ?? []
     countries = preloaded.countries ?? []
     devices = preloaded.devices ?? []
+    browsers = preloaded.browsers ?? []
+    systems = preloaded.systems ?? []
+    bounceRate = preloaded.bounceRate ?? 0
     live = true
   }
   else {
@@ -92,6 +107,8 @@ const maxPage = pages.reduce((m, p) => Math.max(m, Number(p.views || 0)), 0) || 
 const maxRef = referrers.reduce((m, r) => Math.max(m, Number(r.views || 0)), 0) || 1
 const maxCountry = countries.reduce((m, c) => Math.max(m, Number(c.views || 0)), 0) || 1
 const maxDevice = devices.reduce((m, d) => Math.max(m, Number(d.views || 0)), 0) || 1
+const maxBrowser = browsers.reduce((m, b) => Math.max(m, Number(b.views || 0)), 0) || 1
+const maxSystem = systems.reduce((m, s) => Math.max(m, Number(s.views || 0)), 0) || 1
 
 // Country code -> flag emoji (regional-indicator letters); empty for non-2-letter values.
 function flag(code) {
@@ -104,6 +121,7 @@ const kpiCards = [
   { label: 'Unique visitors', value: kpis.visitors.toLocaleString() },
   { label: 'Page views', value: kpis.views.toLocaleString() },
   { label: 'Sessions', value: kpis.sessions.toLocaleString() },
+  { label: 'Bounce rate', value: `${bounceRate}%` },
   { label: 'Views / visitor', value: kpis.visitors ? (kpis.views / kpis.visitors).toFixed(1) : '0.0' },
 ]
 </script>
@@ -170,7 +188,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
     @endif
 
     <!-- KPIs: hairline-separated, mono numerics, no heavy card chrome -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 mb-6 lg:divide-x panel reveal" style="border-color: var(--border)">
+    <div class="grid grid-cols-2 lg:grid-cols-5 mb-6 lg:divide-x panel reveal" style="border-color: var(--border)">
       @foreach (kpiCards as kpi)
         <div class="px-5 py-5" style="border-color: var(--border)">
           <div class="mb-2 font-medium text-xs tracking-wider uppercase" style="color: var(--text-3)">{{ kpi.label }}</div>
@@ -252,6 +270,36 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
           </div>
         @empty
           <div class="py-8 text-center text-sm" style="color: var(--text-3)">No device data yet.</div>
+        @endforelse
+      </div>
+    </div>
+
+    <div class="grid gap-6 md:grid-cols-2 mt-6">
+      <!-- Browsers -->
+      <div class="p-5 panel reveal">
+        <h2 class="mb-4 font-semibold text-xs tracking-wider uppercase" style="color: var(--text-3)">Browsers</h2>
+        @forelse (browsers as b)
+          <div class="flex relative items-center justify-between py-2.5 text-sm">
+            <div class="absolute inset-y-1 left-0 rounded" style="width: {{ Math.round((Number(b.views) / maxBrowser) * 100) }}%; background: var(--bar);"></div>
+            <span class="relative pr-2 truncate" style="color: var(--text-2)">{{ b.browser }}</span>
+            <span class="relative font-medium tabular-nums mono">{{ Number(b.views).toLocaleString() }}</span>
+          </div>
+        @empty
+          <div class="py-8 text-center text-sm" style="color: var(--text-3)">No browser data yet.</div>
+        @endforelse
+      </div>
+
+      <!-- Operating systems -->
+      <div class="p-5 panel reveal">
+        <h2 class="mb-4 font-semibold text-xs tracking-wider uppercase" style="color: var(--text-3)">Operating systems</h2>
+        @forelse (systems as s)
+          <div class="flex relative items-center justify-between py-2.5 text-sm">
+            <div class="absolute inset-y-1 left-0 rounded" style="width: {{ Math.round((Number(s.views) / maxSystem) * 100) }}%; background: var(--bar);"></div>
+            <span class="relative pr-2 truncate" style="color: var(--text-2)">{{ s.os }}</span>
+            <span class="relative font-medium tabular-nums mono">{{ Number(s.views).toLocaleString() }}</span>
+          </div>
+        @empty
+          <div class="py-8 text-center text-sm" style="color: var(--text-3)">No OS data yet.</div>
         @endforelse
       </div>
     </div>
