@@ -26,6 +26,8 @@ let kpis = { views: 0, visitors: 0, sessions: 0 }
 let series = []
 let pages = []
 let referrers = []
+let countries = []
+let devices = []
 let live = false
 
 // Race all DB work against a short timeout: if SingleStore isn't reachable, a
@@ -53,6 +55,10 @@ async function loadData() {
     `SELECT path, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors FROM page_views WHERE ${filter} GROUP BY path ORDER BY views DESC LIMIT 8`, p)) ?? []
   referrers = (await db.unsafe(
     `SELECT referrer_source AS source, COUNT(*) AS views FROM page_views WHERE ${filter} GROUP BY referrer_source ORDER BY views DESC LIMIT 8`, p)) ?? []
+  countries = (await db.unsafe(
+    `SELECT country, COUNT(*) AS views FROM page_views WHERE ${filter} AND country IS NOT NULL AND country != '' GROUP BY country ORDER BY views DESC LIMIT 8`, p)) ?? []
+  devices = (await db.unsafe(
+    `SELECT device_type AS device, COUNT(*) AS views FROM page_views WHERE ${filter} AND device_type IS NOT NULL AND device_type != '' GROUP BY device_type ORDER BY views DESC LIMIT 8`, p)) ?? []
   live = true
 }
 
@@ -65,6 +71,8 @@ try {
     series = preloaded.series ?? []
     pages = preloaded.pages ?? []
     referrers = preloaded.referrers ?? []
+    countries = preloaded.countries ?? []
+    devices = preloaded.devices ?? []
     live = true
   }
   else {
@@ -82,6 +90,15 @@ catch {
 const maxViews = series.reduce((m, s) => Math.max(m, Number(s.views || 0)), 0) || 1
 const maxPage = pages.reduce((m, p) => Math.max(m, Number(p.views || 0)), 0) || 1
 const maxRef = referrers.reduce((m, r) => Math.max(m, Number(r.views || 0)), 0) || 1
+const maxCountry = countries.reduce((m, c) => Math.max(m, Number(c.views || 0)), 0) || 1
+const maxDevice = devices.reduce((m, d) => Math.max(m, Number(d.views || 0)), 0) || 1
+
+// Country code -> flag emoji (regional-indicator letters); empty for non-2-letter values.
+function flag(code) {
+  if (!code || String(code).length !== 2)
+    return ''
+  return String.fromCodePoint(...[...String(code).toUpperCase()].map(c => 0x1F1E6 + c.charCodeAt(0) - 65))
+}
 
 const kpiCards = [
   { label: 'Unique visitors', value: kpis.visitors.toLocaleString() },
@@ -205,6 +222,36 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
           </div>
         @empty
           <div class="py-8 text-center text-sm" style="color: var(--text-3)">No sources yet.</div>
+        @endforelse
+      </div>
+    </div>
+
+    <div class="grid gap-6 md:grid-cols-2 mt-6">
+      <!-- Top countries -->
+      <div class="p-5 panel reveal">
+        <h2 class="mb-4 font-semibold text-xs tracking-wider uppercase" style="color: var(--text-3)">Top countries</h2>
+        @forelse (countries as c)
+          <div class="flex relative items-center justify-between py-2.5 text-sm">
+            <div class="absolute inset-y-1 left-0 rounded" style="width: {{ Math.round((Number(c.views) / maxCountry) * 100) }}%; background: var(--bar);"></div>
+            <span class="relative pr-2 truncate" style="color: var(--text-2)">{{ flag(c.country) }} {{ c.country }}</span>
+            <span class="relative font-medium tabular-nums mono">{{ Number(c.views).toLocaleString() }}</span>
+          </div>
+        @empty
+          <div class="py-8 text-center text-sm" style="color: var(--text-3)">No country data yet.</div>
+        @endforelse
+      </div>
+
+      <!-- Devices -->
+      <div class="p-5 panel reveal">
+        <h2 class="mb-4 font-semibold text-xs tracking-wider uppercase" style="color: var(--text-3)">Devices</h2>
+        @forelse (devices as d)
+          <div class="flex relative items-center justify-between py-2.5 text-sm">
+            <div class="absolute inset-y-1 left-0 rounded" style="width: {{ Math.round((Number(d.views) / maxDevice) * 100) }}%; background: var(--bar);"></div>
+            <span class="relative pr-2 capitalize truncate" style="color: var(--text-2)">{{ d.device }}</span>
+            <span class="relative font-medium tabular-nums mono">{{ Number(d.views).toLocaleString() }}</span>
+          </div>
+        @empty
+          <div class="py-8 text-center text-sm" style="color: var(--text-3)">No device data yet.</div>
         @endforelse
       </div>
     </div>
