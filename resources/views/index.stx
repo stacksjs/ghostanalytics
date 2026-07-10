@@ -4,15 +4,6 @@ const siteMode = 'live'
 const comingSoonBypassEnabled = true
 const comingSoonBypassToken = 'trailhead'
 
-const navLinks = [
-  { label: 'Features', url: '#features' },
-  { label: 'Use cases', url: '/use-cases', native: true },
-  { label: 'Privacy', url: '/features/privacy', native: true },
-  { label: 'Compare', url: '#compare' },
-  { label: 'Docs', url: '/docs', native: true },
-  { label: 'GitHub', url: 'https://github.com/stacksjs/ghostanalytics', native: true },
-]
-
 // Feature bento cells link to their dedicated pages.
 const featureCells = [
   { slug: 'real-time', cls: 'cell lead', title: 'Real-time visitors', body: 'See who is on your site right now, which pages they are reading, and where they arrived from. Updated live, with no refresh.', spark: true },
@@ -120,31 +111,7 @@ const footerGroups = [
     </section>
 
     <div class="site-content">
-      <nav class="nav">
-        <div class="nav-inner shell">
-          <a class="brand" href="/" aria-label="ghostanalytics home">
-            <span class="brand-mark">g</span>
-            <span class="brand-name">{{ appName }}</span>
-          </a>
-          <div class="nav-links" aria-label="Primary navigation">
-            @foreach (navLinks as link)
-              <a href="{{ link.url }}" {{ link.native ? 'data-no-router' : '' }}>{{ link.label }}</a>
-            @endforeach
-          </div>
-          <a class="nav-login" href="/login">Log in</a>
-        <a class="btn primary sm nav-cta" href="/register">Sign up</a>
-          <details class="nav-menu">
-            <summary aria-label="Open menu"><span class="burger" aria-hidden="true"></span></summary>
-            <div class="nav-menu-panel">
-              @foreach (navLinks as link)
-                <a href="{{ link.url }}" {{ link.native ? 'data-no-router' : '' }}>{{ link.label }}</a>
-              @endforeach
-              <a href="/login">Log in</a>
-            <a class="btn primary sm" href="/register">Sign up</a>
-            </div>
-          </details>
-        </div>
-      </nav>
+      @include('site-nav')
 
       <main>
         <section class="hero shell">

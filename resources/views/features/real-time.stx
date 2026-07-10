@@ -6,15 +6,6 @@ const meta = {
   description: 'See who is on your site right now, which pages they are reading, and where they came from. Live visitor tracking with no cookies and no reload.',
 }
 
-const navLinks = [
-  { label: 'Features', url: '/#features' },
-  { label: 'Use cases', url: '/use-cases' },
-  { label: 'Privacy', url: '/features/privacy' },
-  { label: 'Compare', url: '/#compare' },
-  { label: 'Docs', url: '/docs' },
-  { label: 'GitHub', url: 'https://github.com/stacksjs/ghostanalytics' },
-]
-
 // live sparkline (real values drive the path, no fake chrome)
 const spark = [8, 12, 10, 16, 14, 22, 19, 28, 24, 33, 30, 41, 47]
 const sMax = Math.max(...spark)
@@ -55,31 +46,7 @@ const related = [
     <link rel="stylesheet" href="/marketing.css">
   </head>
   <body>
-    <nav class="nav">
-      <div class="nav-inner shell">
-        <a class="brand" href="/" aria-label="ghostanalytics home">
-          <span class="brand-mark">g</span>
-          <span class="brand-name">{{ appName }}</span>
-        </a>
-        <div class="nav-links" aria-label="Primary navigation">
-          @foreach (navLinks as link)
-            <a href="{{ link.url }}">{{ link.label }}</a>
-          @endforeach
-        </div>
-        <a class="nav-login" href="/login">Log in</a>
-        <a class="btn primary sm nav-cta" href="/register">Sign up</a>
-        <details class="nav-menu">
-          <summary aria-label="Open menu"><span class="burger" aria-hidden="true"></span></summary>
-          <div class="nav-menu-panel">
-            @foreach (navLinks as link)
-              <a href="{{ link.url }}">{{ link.label }}</a>
-            @endforeach
-            <a href="/login">Log in</a>
-            <a class="btn primary sm" href="/register">Sign up</a>
-          </div>
-        </details>
-      </div>
-    </nav>
+    @include('site-nav')
 
     <main>
       <nav class="subnav shell" aria-label="Breadcrumb">

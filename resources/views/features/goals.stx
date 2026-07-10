@@ -10,37 +10,7 @@
     <link rel="stylesheet" href="/marketing.css">
   </head>
   <body>
-    <nav class="nav">
-      <div class="nav-inner shell">
-        <a class="brand" href="/" aria-label="ghostanalytics home">
-          <span class="brand-mark">g</span>
-          <span class="brand-name">ghostanalytics</span>
-        </a>
-        <div class="nav-links" aria-label="Primary navigation">
-            <a href="/#features">Features</a>
-            <a href="/use-cases">Use cases</a>
-            <a href="/features/privacy">Privacy</a>
-            <a href="/#compare">Compare</a>
-            <a href="/docs">Docs</a>
-            <a href="https://github.com/stacksjs/ghostanalytics">GitHub</a>
-        </div>
-        <a class="nav-login" href="/login">Log in</a>
-        <a class="btn primary sm nav-cta" href="/register">Sign up</a>
-        <details class="nav-menu">
-          <summary aria-label="Open menu"><span class="burger" aria-hidden="true"></span></summary>
-          <div class="nav-menu-panel">
-            <a href="/#features">Features</a>
-            <a href="/use-cases">Use cases</a>
-            <a href="/features/privacy">Privacy</a>
-            <a href="/#compare">Compare</a>
-            <a href="/docs">Docs</a>
-            <a href="https://github.com/stacksjs/ghostanalytics">GitHub</a>
-            <a href="/login">Log in</a>
-            <a class="btn primary sm" href="/register">Sign up</a>
-          </div>
-        </details>
-      </div>
-    </nav>
+    @include('site-nav')
 
     <main>
       <nav class="subnav shell" aria-label="Breadcrumb">
