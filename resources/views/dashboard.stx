@@ -31,6 +31,10 @@ let devices = []
 let browsers = []
 let systems = []
 let bounceRate = 0
+let prevViews = 0
+let prevVisitors = 0
+let prevSessions = 0
+let prevBounce = 0
 let live = false
 
 // Race all DB work against a short timeout: if SingleStore isn't reachable, a
@@ -71,6 +75,17 @@ async function loadData() {
   const b = (await db.unsafe(
     `SELECT COUNT(*) AS sessions, SUM(pv = 1) AS bounced FROM (SELECT session_id, COUNT(*) AS pv FROM page_views WHERE ${filter} GROUP BY session_id) t`, p))?.[0]
   bounceRate = Number(b?.sessions) ? Math.round((Number(b.bounced) / Number(b.sessions)) * 100) : 0
+  // Previous period (same length, immediately before) for trend deltas.
+  const prevFrom = new Date(new Date(from).getTime() - days * 864e5).toISOString()
+  const pp = [siteId, prevFrom, from]
+  const prow = (await db.unsafe(
+    `SELECT COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors, COUNT(DISTINCT session_id) AS sessions FROM page_views WHERE ${filter}`, pp))?.[0]
+  prevViews = Number(prow?.views ?? 0)
+  prevVisitors = Number(prow?.visitors ?? 0)
+  prevSessions = Number(prow?.sessions ?? 0)
+  const pb = (await db.unsafe(
+    `SELECT COUNT(*) AS sessions, SUM(pv = 1) AS bounced FROM (SELECT session_id, COUNT(*) AS pv FROM page_views WHERE ${filter} GROUP BY session_id) t`, pp))?.[0]
+  prevBounce = Number(pb?.sessions) ? Math.round((Number(pb.bounced) / Number(pb.sessions)) * 100) : 0
   live = true
 }
 
@@ -88,6 +103,10 @@ try {
     browsers = preloaded.browsers ?? []
     systems = preloaded.systems ?? []
     bounceRate = preloaded.bounceRate ?? 0
+    prevViews = preloaded.prevViews ?? 0
+    prevVisitors = preloaded.prevVisitors ?? 0
+    prevSessions = preloaded.prevSessions ?? 0
+    prevBounce = preloaded.prevBounce ?? 0
     live = true
   }
   else {
@@ -117,12 +136,21 @@ function flag(code) {
   return String.fromCodePoint(...[...String(code).toUpperCase()].map(c => 0x1F1E6 + c.charCodeAt(0) - 65))
 }
 
+// Signed percent change vs the previous period; null when there is no baseline.
+function pct(cur, prev) {
+  if (!prev)
+    return null
+  return Math.round(((cur - prev) / prev) * 100)
+}
+const curVpv = kpis.visitors ? kpis.views / kpis.visitors : 0
+const prevVpv = prevVisitors ? prevViews / prevVisitors : 0
+
 const kpiCards = [
-  { label: 'Unique visitors', value: kpis.visitors.toLocaleString() },
-  { label: 'Page views', value: kpis.views.toLocaleString() },
-  { label: 'Sessions', value: kpis.sessions.toLocaleString() },
-  { label: 'Bounce rate', value: `${bounceRate}%` },
-  { label: 'Views / visitor', value: kpis.visitors ? (kpis.views / kpis.visitors).toFixed(1) : '0.0' },
+  { label: 'Unique visitors', value: kpis.visitors.toLocaleString(), delta: pct(kpis.visitors, prevVisitors), goodUp: true },
+  { label: 'Page views', value: kpis.views.toLocaleString(), delta: pct(kpis.views, prevViews), goodUp: true },
+  { label: 'Sessions', value: kpis.sessions.toLocaleString(), delta: pct(kpis.sessions, prevSessions), goodUp: true },
+  { label: 'Bounce rate', value: `${bounceRate}%`, delta: pct(bounceRate, prevBounce), goodUp: false },
+  { label: 'Views / visitor', value: kpis.visitors ? curVpv.toFixed(1) : '0.0', delta: pct(curVpv, prevVpv), goodUp: true },
 ]
 </script>
 
@@ -193,6 +221,11 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
         <div class="px-5 py-5" style="border-color: var(--border)">
           <div class="mb-2 font-medium text-xs tracking-wider uppercase" style="color: var(--text-3)">{{ kpi.label }}</div>
           <div class="font-semibold text-3xl tracking-tight mono">{{ kpi.value }}</div>
+          @if (kpi.delta !== null)
+            <div class="mt-1.5 font-medium text-xs mono" style="color: {{ (kpi.delta >= 0) === kpi.goodUp ? '#10b981' : '#ef4444' }}">
+              {{ kpi.delta >= 0 ? '▲' : '▼' }} {{ Math.abs(kpi.delta) }}% <span style="color: var(--text-3)">vs prev</span>
+            </div>
+          @endif
         </div>
       @endforeach
     </div>
