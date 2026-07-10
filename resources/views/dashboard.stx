@@ -24,6 +24,88 @@ const ranges = [
   { key: '1y', label: '1 year' },
 ]
 
+// ---- Interactive filter engine -------------------------------------------
+// Click any breakdown row to filter the whole dashboard to that segment; filters
+// compose (AND) and coexist with site+range. Each url key maps to a page_views
+// column (or the special 'channel' key, expanded below). CH_SEARCH/CH_SOCIAL are
+// defined here (moved up from near channelOf) so the channel expansion reuses the
+// exact same source sets as channelOf.
+const CH_SEARCH = new Set(['google', 'bing', 'duckduckgo', 'yahoo', 'baidu', 'ecosia'])
+const CH_SOCIAL = new Set(['twitter', 'x', 'facebook', 'instagram', 'linkedin', 'reddit', 'hacker news', 'youtube', 'mastodon', 'bluesky', 'tiktok'])
+const FILTERS = {
+  path: { col: 'path', label: 'Path' },
+  source: { col: 'referrer_source', label: 'Source' },
+  channel: { col: null, label: 'Channel' },
+  country: { col: 'country', label: 'Country' },
+  device: { col: 'device_type', label: 'Device' },
+  browser: { col: 'browser', label: 'Browser' },
+  os: { col: 'os', label: 'OS' },
+  campaign: { col: 'utm_campaign', label: 'Campaign' },
+  utmsource: { col: 'utm_source', label: 'UTM source' },
+  utmmedium: { col: 'utm_medium', label: 'UTM medium' },
+}
+// Channel name -> a parameterized predicate on referrer_source, matching channelOf:
+// Search/Social = IN their source set; Direct = ''/'Direct'/NULL; Referral = the rest.
+function channelPredicate(name) {
+  // TRIM the column so this matches channelOf's String(src).trim() bucketing exactly
+  // (a ' Direct' referrer must filter the same way the channel panel folds it).
+  if (name === 'Search' || name === 'Social') {
+    const arr = [...(name === 'Search' ? CH_SEARCH : CH_SOCIAL)]
+    return { sql: ` AND TRIM(referrer_source) IN (${arr.map(() => '?').join(',')})`, params: arr }
+  }
+  if (name === 'Direct')
+    return { sql: ` AND (TRIM(referrer_source) IN ('', 'Direct') OR referrer_source IS NULL)`, params: [] }
+  // Referral: has a referrer that is not Direct and not in the Search/Social sets.
+  const other = [...CH_SEARCH, ...CH_SOCIAL]
+  return { sql: ` AND referrer_source IS NOT NULL AND TRIM(referrer_source) NOT IN ('', 'Direct'${other.length ? ', ' + other.map(() => '?').join(', ') : ''})`, params: other }
+}
+// Parse only known, non-empty filter keys into activeFilters + build the SQL fragment
+// that gets baked into every WHERE ${filter} query below.
+const CHANNEL_NAMES = ['Search', 'Social', 'Direct', 'Referral']
+const activeFilters = []
+let filterSql = ''
+const filterParams = []
+for (const key of Object.keys(FILTERS)) {
+  const raw = query.get(key)
+  if (raw == null)
+    continue
+  const value = String(raw).trim()
+  if (!value)
+    continue
+  const def = FILTERS[key]
+  if (key === 'channel') {
+    const name = value.charAt(0).toUpperCase() + value.slice(1).toLowerCase()
+    if (!CHANNEL_NAMES.includes(name))
+      continue
+    const pred = channelPredicate(name)
+    filterSql += pred.sql
+    filterParams.push(...pred.params)
+    activeFilters.push({ key, label: def.label, value: name })
+  }
+  else {
+    filterSql += ` AND ${def.col} = ?`
+    filterParams.push(value)
+    activeFilters.push({ key, label: def.label, value })
+  }
+}
+// URL helpers for the markup: preserve site+range+existing filters; add/remove one key.
+function filterQuery(mutate) {
+  const q = new URLSearchParams()
+  q.set('site', siteId)
+  q.set('range', range)
+  for (const f of activeFilters)
+    q.set(f.key, f.value)
+  mutate(q)
+  return `?${q.toString()}`
+}
+function addFilterUrl(key, value) {
+  return filterQuery(q => q.set(key, String(value)))
+}
+function removeFilterUrl(key) {
+  return filterQuery(q => q.delete(key))
+}
+// --------------------------------------------------------------------------
+
 let kpis = { views: 0, visitors: 0, sessions: 0 }
 let series = []
 let pages = []
@@ -57,8 +139,8 @@ async function loadData() {
     if (t?.[0]?.site_id)
       siteId = t[0].site_id
   }
-  const p = [siteId, from, to]
-  const filter = 'site_id = ? AND timestamp >= ? AND timestamp <= ?'
+  const p = [siteId, from, to, ...filterParams]
+  const filter = `site_id = ? AND timestamp >= ? AND timestamp <= ?${filterSql}`
 
   const row = (await db.unsafe(
     `SELECT COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors, COUNT(DISTINCT session_id) AS sessions FROM page_views WHERE ${filter}`, p))?.[0]
@@ -93,9 +175,9 @@ async function loadData() {
   bounceRate = Number(b?.sessions) ? Math.round((Number(b.bounced) / Number(b.sessions)) * 100) : 0
   // Previous period (same length, immediately before) for trend deltas.
   const prevFrom = new Date(new Date(from).getTime() - days * 864e5).toISOString()
-  const pp = [siteId, prevFrom, from]
+  const pp = [siteId, prevFrom, from, ...filterParams]
   // Strict upper bound so the boundary instant `from` belongs to the current period only.
-  const filterPrev = 'site_id = ? AND timestamp >= ? AND timestamp < ?'
+  const filterPrev = `site_id = ? AND timestamp >= ? AND timestamp < ?${filterSql}`
   const prow = (await db.unsafe(
     `SELECT COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors, COUNT(DISTINCT session_id) AS sessions FROM page_views WHERE ${filterPrev}`, pp))?.[0]
   prevViews = Number(prow?.views ?? 0)
@@ -106,8 +188,8 @@ async function loadData() {
   prevBounce = Number(pb?.sessions) ? Math.round((Number(pb.bounced) / Number(pb.sessions)) * 100) : 0
   // Unique visitors in the last ~5 minutes (reuses the resolved siteId).
   const lv = (await db.unsafe(
-    `SELECT COUNT(DISTINCT visitor_id) AS current FROM page_views WHERE site_id = ? AND timestamp >= ?`,
-    [siteId, liveFrom]))?.[0]
+    `SELECT COUNT(DISTINCT visitor_id) AS current FROM page_views WHERE site_id = ? AND timestamp >= ?${filterSql}`,
+    [siteId, liveFrom, ...filterParams]))?.[0]
   liveNow = Number(lv?.current ?? 0)
   live = true
 }
@@ -160,8 +242,7 @@ const maxUtmSource = utmSources.reduce((m, s) => Math.max(m, Number(s.views || 0
 const maxUtmMedium = utmMediums.reduce((m, u) => Math.max(m, Number(u.views || 0)), 0) || 1
 
 // Fold app-classified referrer_source strings into 4 channels, sum views, sort desc.
-const CH_SEARCH = new Set(['google', 'bing', 'duckduckgo', 'yahoo', 'baidu', 'ecosia'])
-const CH_SOCIAL = new Set(['twitter', 'x', 'facebook', 'instagram', 'linkedin', 'reddit', 'hacker news', 'youtube', 'mastodon', 'bluesky', 'tiktok'])
+// CH_SEARCH/CH_SOCIAL are defined up top (in the filter engine) so both share one set.
 function channelOf(src) {
   const s = String(src ?? '').trim().toLowerCase()
   if (!s || s === 'direct')
@@ -342,6 +423,22 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
 
 /* Export CSV pill: hover tightens the border to the accent like the range pills. */
 #export-csv:hover { color: var(--text); border-color: var(--accent); }
+
+/* Clickable breakdown rows: whole row is a link that adds a filter. Keep the row
+  chrome identical; a subtle wash + cursor on hover is the only affordance. The bar
+  div uses inset-y-1, so the anchor keeps position: relative as its offset parent. */
+.ga-row { display: flex; text-decoration: none; color: inherit; border-radius: 6px; cursor: pointer; transition: background-color 0.12s ease; }
+.ga-row:hover { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+@supports not (background: color-mix(in srgb, red, blue)) { .ga-row:hover { background: var(--bar); } }
+.ga-row:hover .ga-row-label { color: var(--text); }
+
+/* Filter-pill bar: active segment filters, each removable; matches the range pills. */
+.filter-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px 4px 11px; border: 1px solid var(--border); background: var(--panel); color: var(--text-2); text-decoration: none; }
+.filter-pill:hover { border-color: var(--accent); color: var(--text); }
+.filter-pill .fx { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 999px; font-size: 12px; line-height: 1; color: var(--text-3); }
+.filter-pill:hover .fx { color: var(--accent); }
+.filter-clear { color: var(--text-3); text-decoration: none; }
+.filter-clear:hover { color: var(--text); }
 </style>
 
 <div class="px-5 py-10 md:px-10 min-h-[100dvh]">
@@ -370,6 +467,20 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
           style="color: var(--text-2); border-color: var(--border); background: var(--panel); cursor: pointer;">Export CSV</button>
       </nav>
     </header>
+
+    <!-- Active filters: click a breakdown row to add one; each pill removes itself,
+        "Clear all" returns to the unfiltered site+range view. Empty when none. -->
+    @if (activeFilters.length)
+      <div class="flex flex-wrap gap-2 items-center mb-6 reveal">
+        @foreach (activeFilters as f)
+          <a href="{{ removeFilterUrl(f.key) }}" class="font-medium text-xs filter-pill pill" title="Remove filter">
+            <span><span style="color: var(--text-3)">{{ f.label }}:</span> <span class="mono" style="color: var(--text)">{{ f.value }}</span></span>
+            <span class="fx" aria-hidden="true">×</span>
+          </a>
+        @endforeach
+        <a href="?site={{ siteId }}&range={{ range }}" class="ml-1 font-medium text-xs filter-clear">Clear all</a>
+      </div>
+    @endif
 
     @if (!live)
       <div class="mb-8 px-4 py-3 text-sm panel reveal" style="color: var(--text-2)">
@@ -445,11 +556,11 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       <div class="p-5 panel reveal">
         <h2 class="mb-4 font-semibold text-xs tracking-wider uppercase" style="color: var(--text-3)">Top pages</h2>
         @forelse (pages as p)
-          <div class="flex relative items-center justify-between py-2.5 text-sm">
+          <a href="{{ addFilterUrl('path', p.path) }}" class="relative items-center justify-between -mx-1 px-1 py-2.5 text-sm ga-row">
             <div class="absolute inset-y-1 left-0 rounded" style="width: {{ Math.round((Number(p.views) / maxPage) * 100) }}%; background: var(--bar);"></div>
-            <span class="relative pr-2 truncate mono" style="color: var(--text-2)">{{ p.path }}</span>
+            <span class="relative pr-2 truncate ga-row-label mono" style="color: var(--text-2)">{{ p.path }}</span>
             <span class="relative font-medium tabular-nums mono">{{ Number(p.views).toLocaleString() }}</span>
-          </div>
+          </a>
         @empty
           <div class="py-8 text-center text-sm" style="color: var(--text-3)">No pages yet.</div>
         @endforelse
@@ -459,11 +570,11 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       <div class="p-5 panel reveal">
         <h2 class="mb-4 font-semibold text-xs tracking-wider uppercase" style="color: var(--text-3)">Top sources</h2>
         @forelse (referrers as r)
-          <div class="flex relative items-center justify-between py-2.5 text-sm">
+          <a href="{{ addFilterUrl('source', r.source) }}" class="relative items-center justify-between -mx-1 px-1 py-2.5 text-sm ga-row">
             <div class="absolute inset-y-1 left-0 rounded" style="width: {{ Math.round((Number(r.views) / maxRef) * 100) }}%; background: var(--bar);"></div>
-            <span class="relative pr-2 truncate" style="color: var(--text-2)">{{ r.source }}</span>
+            <span class="relative pr-2 truncate ga-row-label" style="color: var(--text-2)">{{ r.source }}</span>
             <span class="relative font-medium tabular-nums mono">{{ Number(r.views).toLocaleString() }}</span>
-          </div>
+          </a>
         @empty
           <div class="py-8 text-center text-sm" style="color: var(--text-3)">No sources yet.</div>
         @endforelse
@@ -475,11 +586,11 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       <div class="p-5 panel reveal">
         <h2 class="mb-4 font-semibold text-xs tracking-wider uppercase" style="color: var(--text-3)">Top countries</h2>
         @forelse (countries as c)
-          <div class="flex relative items-center justify-between py-2.5 text-sm">
+          <a href="{{ addFilterUrl('country', c.country) }}" class="relative items-center justify-between -mx-1 px-1 py-2.5 text-sm ga-row">
             <div class="absolute inset-y-1 left-0 rounded" style="width: {{ Math.round((Number(c.views) / maxCountry) * 100) }}%; background: var(--bar);"></div>
-            <span class="relative pr-2 truncate" style="color: var(--text-2)">{{ flag(c.country) }} {{ c.country }}</span>
+            <span class="relative pr-2 truncate ga-row-label" style="color: var(--text-2)">{{ flag(c.country) }} {{ c.country }}</span>
             <span class="relative font-medium tabular-nums mono">{{ Number(c.views).toLocaleString() }}</span>
-          </div>
+          </a>
         @empty
           <div class="py-8 text-center text-sm" style="color: var(--text-3)">No country data yet.</div>
         @endforelse
@@ -489,11 +600,11 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       <div class="p-5 panel reveal">
         <h2 class="mb-4 font-semibold text-xs tracking-wider uppercase" style="color: var(--text-3)">Devices</h2>
         @forelse (devices as d)
-          <div class="flex relative items-center justify-between py-2.5 text-sm">
+          <a href="{{ addFilterUrl('device', d.device) }}" class="relative items-center justify-between -mx-1 px-1 py-2.5 text-sm ga-row">
             <div class="absolute inset-y-1 left-0 rounded" style="width: {{ Math.round((Number(d.views) / maxDevice) * 100) }}%; background: var(--bar);"></div>
-            <span class="relative pr-2 capitalize truncate" style="color: var(--text-2)">{{ d.device }}</span>
+            <span class="relative pr-2 capitalize truncate ga-row-label" style="color: var(--text-2)">{{ d.device }}</span>
             <span class="relative font-medium tabular-nums mono">{{ Number(d.views).toLocaleString() }}</span>
-          </div>
+          </a>
         @empty
           <div class="py-8 text-center text-sm" style="color: var(--text-3)">No device data yet.</div>
         @endforelse
@@ -505,11 +616,11 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       <div class="p-5 panel reveal">
         <h2 class="mb-4 font-semibold text-xs tracking-wider uppercase" style="color: var(--text-3)">Browsers</h2>
         @forelse (browsers as b)
-          <div class="flex relative items-center justify-between py-2.5 text-sm">
+          <a href="{{ addFilterUrl('browser', b.browser) }}" class="relative items-center justify-between -mx-1 px-1 py-2.5 text-sm ga-row">
             <div class="absolute inset-y-1 left-0 rounded" style="width: {{ Math.round((Number(b.views) / maxBrowser) * 100) }}%; background: var(--bar);"></div>
-            <span class="relative pr-2 truncate" style="color: var(--text-2)">{{ b.browser }}</span>
+            <span class="relative pr-2 truncate ga-row-label" style="color: var(--text-2)">{{ b.browser }}</span>
             <span class="relative font-medium tabular-nums mono">{{ Number(b.views).toLocaleString() }}</span>
-          </div>
+          </a>
         @empty
           <div class="py-8 text-center text-sm" style="color: var(--text-3)">No browser data yet.</div>
         @endforelse
@@ -519,11 +630,11 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       <div class="p-5 panel reveal">
         <h2 class="mb-4 font-semibold text-xs tracking-wider uppercase" style="color: var(--text-3)">Operating systems</h2>
         @forelse (systems as s)
-          <div class="flex relative items-center justify-between py-2.5 text-sm">
+          <a href="{{ addFilterUrl('os', s.os) }}" class="relative items-center justify-between -mx-1 px-1 py-2.5 text-sm ga-row">
             <div class="absolute inset-y-1 left-0 rounded" style="width: {{ Math.round((Number(s.views) / maxSystem) * 100) }}%; background: var(--bar);"></div>
-            <span class="relative pr-2 truncate" style="color: var(--text-2)">{{ s.os }}</span>
+            <span class="relative pr-2 truncate ga-row-label" style="color: var(--text-2)">{{ s.os }}</span>
             <span class="relative font-medium tabular-nums mono">{{ Number(s.views).toLocaleString() }}</span>
-          </div>
+          </a>
         @empty
           <div class="py-8 text-center text-sm" style="color: var(--text-3)">No OS data yet.</div>
         @endforelse
@@ -534,14 +645,14 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
     <div class="mt-6 p-5 panel reveal">
       <h2 class="mb-4 font-semibold text-xs tracking-wider uppercase" style="color: var(--text-3)">Referrer channels</h2>
       @forelse (channels as c)
-        <div class="flex relative items-center justify-between py-2.5 text-sm">
+        <a href="{{ addFilterUrl('channel', c.name) }}" class="relative items-center justify-between -mx-1 px-1 py-2.5 text-sm ga-row">
           <div class="absolute inset-y-1 left-0 rounded" style="width: {{ Math.round((Number(c.views) / maxChannel) * 100) }}%; background: var(--bar);"></div>
-          <span class="relative pr-2 truncate" style="color: var(--text-2)">{{ c.name }}</span>
+          <span class="relative pr-2 truncate ga-row-label" style="color: var(--text-2)">{{ c.name }}</span>
           <span class="flex relative gap-2.5 items-baseline">
             <span class="tabular-nums mono" style="color: var(--text-3)">{{ Math.round((Number(c.views) / channelTotal) * 100) || (c.views ? '<1' : '0') }}%</span>
             <span class="font-medium tabular-nums mono">{{ Number(c.views).toLocaleString() }}</span>
           </span>
-        </div>
+        </a>
       @empty
         <div class="py-8 text-center text-sm" style="color: var(--text-3)">No channel data yet.</div>
       @endforelse
@@ -551,11 +662,11 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
     <div class="mt-6 p-5 panel reveal">
       <h2 class="mb-4 font-semibold text-xs tracking-wider uppercase" style="color: var(--text-3)">Top campaigns</h2>
       @forelse (campaigns as c)
-        <div class="flex relative items-center justify-between py-2.5 text-sm">
+        <a href="{{ addFilterUrl('campaign', c.campaign) }}" class="relative items-center justify-between -mx-1 px-1 py-2.5 text-sm ga-row">
           <div class="absolute inset-y-1 left-0 rounded" style="width: {{ Math.round((Number(c.views) / maxCampaign) * 100) }}%; background: var(--bar);"></div>
-          <span class="relative pr-2 truncate mono" style="color: var(--text-2)">{{ c.campaign }}</span>
+          <span class="relative pr-2 truncate ga-row-label mono" style="color: var(--text-2)">{{ c.campaign }}</span>
           <span class="relative font-medium tabular-nums mono">{{ Number(c.views).toLocaleString() }}</span>
-        </div>
+        </a>
       @empty
         <div class="py-8 text-center text-sm" style="color: var(--text-3)">No campaign data yet.</div>
       @endforelse
@@ -566,11 +677,11 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       <div class="p-5 panel reveal">
         <h2 class="mb-4 font-semibold text-xs tracking-wider uppercase" style="color: var(--text-3)">Campaign sources</h2>
         @forelse (utmSources as s)
-          <div class="flex relative items-center justify-between py-2.5 text-sm">
+          <a href="{{ addFilterUrl('utmsource', s.source) }}" class="relative items-center justify-between -mx-1 px-1 py-2.5 text-sm ga-row">
             <div class="absolute inset-y-1 left-0 rounded" style="width: {{ Math.round((Number(s.views) / maxUtmSource) * 100) }}%; background: var(--bar);"></div>
-            <span class="relative pr-2 truncate" style="color: var(--text-2)">{{ s.source }}</span>
+            <span class="relative pr-2 truncate ga-row-label" style="color: var(--text-2)">{{ s.source }}</span>
             <span class="relative font-medium tabular-nums mono">{{ Number(s.views).toLocaleString() }}</span>
-          </div>
+          </a>
         @empty
           <div class="py-8 text-center text-sm" style="color: var(--text-3)">No campaign source data yet.</div>
         @endforelse
@@ -580,11 +691,11 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       <div class="p-5 panel reveal">
         <h2 class="mb-4 font-semibold text-xs tracking-wider uppercase" style="color: var(--text-3)">Campaign mediums</h2>
         @forelse (utmMediums as m)
-          <div class="flex relative items-center justify-between py-2.5 text-sm">
+          <a href="{{ addFilterUrl('utmmedium', m.medium) }}" class="relative items-center justify-between -mx-1 px-1 py-2.5 text-sm ga-row">
             <div class="absolute inset-y-1 left-0 rounded" style="width: {{ Math.round((Number(m.views) / maxUtmMedium) * 100) }}%; background: var(--bar);"></div>
-            <span class="relative pr-2 truncate" style="color: var(--text-2)">{{ m.medium }}</span>
+            <span class="relative pr-2 truncate ga-row-label" style="color: var(--text-2)">{{ m.medium }}</span>
             <span class="relative font-medium tabular-nums mono">{{ Number(m.views).toLocaleString() }}</span>
-          </div>
+          </a>
         @empty
           <div class="py-8 text-center text-sm" style="color: var(--text-3)">No campaign medium data yet.</div>
         @endforelse
