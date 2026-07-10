@@ -1,4 +1,3 @@
-import type { Attributes } from '@stacksjs/types'
 import { defineModel } from '@stacksjs/orm'
 import { makeHash } from '@stacksjs/security'
 import { schema } from '@stacksjs/validation'
@@ -72,7 +71,7 @@ export default defineModel({
   },
 
   set: {
-    password: async (attributes: Attributes) => {
+    password: async (attributes: Record<string, any>) => {
       return await makeHash(attributes.password, { algorithm: 'bcrypt' })
     },
   },
