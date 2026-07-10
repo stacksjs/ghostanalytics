@@ -1,0 +1,172 @@
+<script server>
+const funnel = [
+  { step: 'Product views', n: '19,240', pct: 100 },
+  { step: 'Add to cart', n: '3,610', pct: 42 },
+  { step: 'Checkout started', n: '1,180', pct: 21 },
+  { step: 'Orders', n: '742', pct: 12 },
+]
+</script>
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Analytics for ecommerce - ghostanalytics</title>
+    <meta name="description" content="Cookieless analytics for ecommerce. Attribute orders to the campaigns and referrers that earned them, keep checkout free of a consent wall, and stay GDPR-safe for EU shoppers. Powered by ghostanalytics.">
+    <meta name="theme-color" content="#0a0c0e">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap">
+    <link rel="stylesheet" href="/marketing.css">
+  </head>
+  <body>
+    @include('site-nav')
+
+    <main>
+      <nav class="subnav shell" aria-label="Breadcrumb">
+        <a href="/">Home</a><span class="sep">/</span>
+        <a href="/use-cases" data-no-router>Use cases</a><span class="sep">/</span>
+        <span>Ecommerce</span>
+      </nav>
+
+      <section class="hero shell">
+        <div>
+          <p class="eyebrow enter">For ecommerce</p>
+          <h1 class="hero-title enter d1">Every order, tied to the click that earned it.</h1>
+          <p class="hero-sub enter d2">
+            Track carts, checkouts, and revenue without a cookie banner slowing the sale. See which products, pages, and campaigns actually pay, with numbers that match your store.
+          </p>
+          <div class="hero-actions enter d3">
+            <a class="btn primary" href="/#install">Get your script tag</a>
+            <a class="btn ghost" href="/dashboard">See a live dashboard</a>
+          </div>
+        </div>
+
+        <aside class="panel enter d2" aria-label="Sample purchase funnel">
+          <div class="panel-head">
+            <span class="live">Purchase funnel, last 30 days</span>
+            <span class="panel-tag">Sample data</span>
+          </div>
+          <div class="top-pages" style="margin-top:1.2rem;gap:0.9rem;">
+            @foreach (funnel as f)
+              <div>
+                <div class="top-row" style="margin-bottom:0.4rem;">
+                  <span class="path" style="font-family:var(--sans);color:var(--ink);">{{ f.step }}</span>
+                  <span class="count">{{ f.n }}</span>
+                </div>
+                <span class="bar" style="display:block;width:100%;height:8px;"><span style="width: {{ f.pct }}%"></span></span>
+              </div>
+            @endforeach
+          </div>
+        </aside>
+      </section>
+
+      <section class="section shell reveal" aria-label="No consent wall in checkout">
+        <div class="split">
+          <div class="split-text">
+            <h3>No consent wall between a shopper and the buy button.</h3>
+            <p>
+              A cookie prompt on the storefront costs you the first tap and a slice of every sale behind it. ghostanalytics stores nothing on the shopper, so there is no banner to dismiss and nothing standing between a visitor and checkout.
+            </p>
+            <ul class="mini-list">
+              <li><span class="dot" aria-hidden="true"></span>GDPR, CCPA, and PECR friendly, so EU shoppers see no popup.</li>
+              <li><span class="dot" aria-hidden="true"></span>Under 2 KB and first-party, so product pages stay fast.</li>
+              <li><span class="dot" aria-hidden="true"></span>Nothing written to the device, so nothing to opt out of.</li>
+            </ul>
+          </div>
+          <aside class="panel" aria-label="Sample orders by landing page">
+            <div class="panel-head">
+              <span class="live">Orders by landing page</span>
+              <span class="panel-tag">Sample data</span>
+            </div>
+            <div class="top-pages" style="margin-top:1.1rem;">
+              <div class="top-row"><span class="path">/products/tote</span><span class="bar"><span style="width:100%"></span></span><span class="count">228</span></div>
+              <div class="top-row"><span class="path">/collections/new</span><span class="bar"><span style="width:64%"></span></span><span class="count">146</span></div>
+              <div class="top-row"><span class="path">/products/mug</span><span class="bar"><span style="width:44%"></span></span><span class="count">101</span></div>
+              <div class="top-row"><span class="path">/sale</span><span class="bar"><span style="width:31%"></span></span><span class="count">71</span></div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="section shell reveal" aria-label="Revenue attribution">
+        <div class="split rev">
+          <div class="split-text">
+            <h3>Attribution that matches your revenue, not a sample.</h3>
+            <p>
+              GA thresholds and samples your reports right when a campaign gets interesting. ghostanalytics counts every order and carries the UTM tags through to the purchase, so you can tell the channel that drives traffic from the one that drives sales.
+            </p>
+            <ul class="mini-list">
+              <li><span class="dot" aria-hidden="true"></span>UTM source, medium, and campaign on every order.</li>
+              <li><span class="dot" aria-hidden="true"></span>Referrers sorted into search, social, and direct automatically.</li>
+              <li><span class="dot" aria-hidden="true"></span>One-click GA import, so last year's peak season moves with you.</li>
+            </ul>
+          </div>
+          <aside class="panel" aria-label="Sample revenue by source">
+            <div class="panel-head">
+              <span class="live">Revenue by source</span>
+              <span class="panel-tag">Sample data</span>
+            </div>
+            <div class="top-pages" style="margin-top:1.1rem;">
+              <div class="top-row"><span class="path" style="font-family:var(--sans);">Organic search</span><span class="bar"><span style="width:100%"></span></span><span class="count">$28.4k</span></div>
+              <div class="top-row"><span class="path" style="font-family:var(--sans);">Paid social</span><span class="bar"><span style="width:57%"></span></span><span class="count">$16.2k</span></div>
+              <div class="top-row"><span class="path" style="font-family:var(--sans);">Email</span><span class="bar"><span style="width:44%"></span></span><span class="count">$12.5k</span></div>
+              <div class="top-row"><span class="path" style="font-family:var(--sans);">Direct</span><span class="bar"><span style="width:30%"></span></span><span class="count">$8.6k</span></div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="section shell reveal" aria-labelledby="ecom-track">
+        <div class="section-head">
+          <h2 id="ecom-track" class="section-title">What stores track.</h2>
+          <p class="section-intro">The moments that decide a sale, each one a single function call from your storefront.</p>
+        </div>
+        <div class="qa-grid">
+          <div class="qa"><h4>Add to cart</h4><p>Measure intent per product, so you see which items pull shoppers in before they buy.</p></div>
+          <div class="qa"><h4>Checkout started</h4><p>Catch the drop-off between cart and payment, and spot the page that leaks orders.</p></div>
+          <div class="qa"><h4>Purchase</h4><p>Your headline conversion, attributed back to the exact source, campaign, and landing page.</p></div>
+        </div>
+      </section>
+
+      <section class="section shell-narrow reveal" aria-labelledby="ecom-code">
+        <div class="section-head">
+          <h2 id="ecom-code" class="section-title">A sale is one line.</h2>
+          <p class="section-intro">No SDK and no init call. Fire the order from your thank-you page with the value and any properties you want to break it down by later.</p>
+        </div>
+        <div class="code-grid">
+          <div class="code">
+            <div class="code-bar"><span>checkout.ts</span><span>JavaScript</span></div>
+            <pre><span class="cmt">// on the order confirmation page</span>
+<span class="tok">ghost</span>('purchase', { value: 68.00, currency: 'USD', items: 2 })
+
+<span class="cmt">// or a lighter signal earlier in the flow</span>
+<span class="tok">ghost</span>('add_to_cart', { product: 'tote', value: 34.00 })</pre>
+          </div>
+        </div>
+        <p class="code-note">The <code>ghost()</code> function ships with the tracking script, so there is nothing extra to import. Properties like <code>value</code> become breakdowns in your dashboard, and the beacon <code>POST</code>s to your own <code>/collect</code> endpoint, so even ad-blockers count the sale.</p>
+      </section>
+
+      <section class="section shell reveal" aria-label="Get started">
+        <div class="cta-band">
+          <h2>Grow revenue, not your consent overhead.</h2>
+          <div class="cta-actions">
+            <a class="btn primary" href="/#install">Get your script tag</a>
+            <a class="btn ghost" href="/use-cases" data-no-router>All use cases</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer shell">
+      <div class="footer-bottom" style="border-top: none">
+        <a class="brand" href="/" aria-label="ghostanalytics home">
+          <span class="brand-mark">g</span>
+          <span class="brand-name">ghostanalytics</span>
+        </a>
+        <span>No cookies. No personal data. Powered by Stacks and SingleStore.</span>
+      </div>
+    </footer>
+  </body>
+</html>

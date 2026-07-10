@@ -1,0 +1,177 @@
+<script server>
+const events = [
+  { step: 'pageview', n: '128,400', pct: 100 },
+  { step: 'signup', n: '2,140', pct: 34 },
+  { step: 'plan_upgraded', n: '486', pct: 18 },
+  { step: 'export_created', n: '312', pct: 11 },
+]
+</script>
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Analytics for developers - ghostanalytics</title>
+    <meta name="description" content="Cookieless analytics for developers and indie hackers. A one-line script, a one-function events API, self-hostable on SingleStore, and privacy-first by default. Powered by ghostanalytics.">
+    <meta name="theme-color" content="#0a0c0e">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap">
+    <link rel="stylesheet" href="/marketing.css">
+  </head>
+  <body>
+    @include('site-nav')
+
+    <main>
+      <nav class="subnav shell" aria-label="Breadcrumb">
+        <a href="/">Home</a><span class="sep">/</span>
+        <a href="/use-cases" data-no-router>Use cases</a><span class="sep">/</span>
+        <span>Developers</span>
+      </nav>
+
+      <section class="hero shell">
+        <div>
+          <p class="eyebrow enter">For developers &amp; indie hackers</p>
+          <h1 class="hero-title enter d1">One line in, full control out.</h1>
+          <p class="hero-sub enter d2">
+            Drop in a single script tag, fire custom events with one function, and read it all back over a clean API. Self-hostable, SingleStore-backed, and privacy-first by default. Your data stays yours.
+          </p>
+          <div class="hero-actions enter d3">
+            <a class="btn primary" href="/#install">Get your script tag</a>
+            <a class="btn ghost" href="/docs" data-no-router>Read the docs</a>
+          </div>
+        </div>
+
+        <aside class="panel enter d2" aria-label="Sample custom events">
+          <div class="panel-head">
+            <span class="live">Custom events, last 30 days</span>
+            <span class="panel-tag">Sample data</span>
+          </div>
+          <div class="top-pages" style="margin-top:1.2rem;gap:0.9rem;">
+            @foreach (events as e)
+              <div>
+                <div class="top-row" style="margin-bottom:0.4rem;">
+                  <span class="path">{{ e.step }}</span>
+                  <span class="count">{{ e.n }}</span>
+                </div>
+                <span class="bar" style="display:block;width:100%;height:8px;"><span style="width: {{ e.pct }}%"></span></span>
+              </div>
+            @endforeach
+          </div>
+        </aside>
+      </section>
+
+      <section class="section shell reveal" aria-label="Own your data">
+        <div class="split">
+          <div class="split-text">
+            <h3>Own the pipeline, not just the dashboard.</h3>
+            <p>
+              The script and your data live on a host you control. Beacons POST to your own <code>/collect</code> endpoint and aggregates come back from your own SingleStore database, so there is no third party in the middle and nothing leaves for an ad graph.
+            </p>
+            <ul class="mini-list">
+              <li><span class="dot" aria-hidden="true"></span>Self-host it, or point the script at your own domain.</li>
+              <li><span class="dot" aria-hidden="true"></span>SingleStore-backed, so the raw events stay queryable.</li>
+              <li><span class="dot" aria-hidden="true"></span>Open source, MIT-licensed, and framework-agnostic.</li>
+            </ul>
+          </div>
+          <aside class="panel" aria-label="Sample deployment targets">
+            <div class="panel-head">
+              <span class="live">Runs where you run</span>
+              <span class="panel-tag">Sample data</span>
+            </div>
+            <div class="top-pages" style="margin-top:1.1rem;">
+              <div class="top-row"><span class="path" style="font-family:var(--sans);">Bun</span><span class="bar"><span style="width:100%"></span></span><span class="count">edge</span></div>
+              <div class="top-row"><span class="path" style="font-family:var(--sans);">Hono / Express</span><span class="bar"><span style="width:74%"></span></span><span class="count">node</span></div>
+              <div class="top-row"><span class="path" style="font-family:var(--sans);">AWS Lambda</span><span class="bar"><span style="width:58%"></span></span><span class="count">serverless</span></div>
+              <div class="top-row"><span class="path" style="font-family:var(--sans);">Self-hosted</span><span class="bar"><span style="width:42%"></span></span><span class="count">your box</span></div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="section shell reveal" aria-label="Privacy first by default">
+        <div class="split rev">
+          <div class="split-text">
+            <h3>Privacy-first without writing any privacy code.</h3>
+            <p>
+              There are no cookies, no local storage, and no cross-site identifiers to reason about. Visitors are counted with a hash that rotates every 24 hours, so you ship a compliant analytics stack without a consent library or a legal review.
+            </p>
+            <ul class="mini-list">
+              <li><span class="dot" aria-hidden="true"></span>No cookies and no consent banner to bolt on later.</li>
+              <li><span class="dot" aria-hidden="true"></span>GDPR, CCPA, and PECR friendly with nothing to configure.</li>
+              <li><span class="dot" aria-hidden="true"></span>SPA pageviews tracked through the History API automatically.</li>
+            </ul>
+          </div>
+          <aside class="panel" aria-label="Sample API response">
+            <div class="panel-head">
+              <span class="live">GET /api/stats</span>
+              <span class="panel-tag">Sample data</span>
+            </div>
+            <div class="metrics" style="margin-top:1.1rem;grid-template-columns:1fr 1fr;gap:1.25rem 1.5rem;">
+              <div class="metric"><div class="m-value">2,847</div><div class="m-label">visitors</div></div>
+              <div class="metric"><div class="m-value">9,410</div><div class="m-label">pageviews</div></div>
+              <div class="metric"><div class="m-value">47</div><div class="m-label">online now</div></div>
+              <div class="metric"><div class="m-value">312</div><div class="m-label">conversions</div></div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="section shell-narrow reveal" aria-labelledby="dev-code">
+        <div class="section-head">
+          <h2 id="dev-code" class="section-title">Drop it in, then send anything.</h2>
+          <p class="section-intro">One tag starts pageviews. After that, any event you care about is a single call, with any properties you want to break it down by later. No SDK, no init.</p>
+        </div>
+        <div class="code-grid">
+          <div class="code">
+            <div class="code-bar"><span>index.html</span><span>HTML</span></div>
+            <pre>&lt;!-- ghostanalytics --&gt;
+&lt;<span class="tok">script</span> defer src="https://cdn.ghostanalytics.com/script.js" data-site="YOUR_SITE_ID"&gt;&lt;/<span class="tok">script</span>&gt;</pre>
+          </div>
+          <div class="code">
+            <div class="code-bar"><span>anywhere in your app</span><span>JavaScript</span></div>
+            <pre><span class="cmt">// a custom event with whatever properties you want</span>
+<span class="tok">ghost</span>('plan_upgraded', { from: 'free', to: 'pro', seats: 3 })
+
+<span class="cmt">// read your numbers back over the API</span>
+<span class="tok">fetch</span>('/api/stats?range=30d').then(r =&gt; r.json())</pre>
+          </div>
+        </div>
+        <p class="code-note">The <code>ghost()</code> function ships with the tracking script, so there is nothing extra to import. Properties become filters and breakdowns in your dashboard, the beacon <code>POST</code>s to your own <code>/collect</code> endpoint, and everything is readable back over the <code>/api</code> routes you host.</p>
+      </section>
+
+      <section class="section shell reveal" aria-labelledby="dev-track">
+        <div class="section-head">
+          <h2 id="dev-track" class="section-title">What indie builders reach for.</h2>
+          <p class="section-intro">Enough to answer real product questions, none of the dashboard bloat you never open.</p>
+        </div>
+        <div class="qa-grid">
+          <div class="qa"><h4>Custom events</h4><p>Fire <code>ghost('event', {...})</code> from anywhere and it becomes a filterable breakdown, no schema to declare first.</p></div>
+          <div class="qa"><h4>A real API</h4><p>Pull stats over HTTP to build your own status page, Slack digest, or public metrics badge.</p></div>
+          <div class="qa"><h4>Your own data</h4><p>Every raw event lands in a database you own, so you can query, export, or delete on your terms.</p></div>
+        </div>
+      </section>
+
+      <section class="section shell reveal" aria-label="Get started">
+        <div class="cta-band">
+          <h2>Ship analytics you actually own.</h2>
+          <div class="cta-actions">
+            <a class="btn primary" href="/#install">Get your script tag</a>
+            <a class="btn ghost" href="/docs" data-no-router>Read the docs</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer shell">
+      <div class="footer-bottom" style="border-top: none">
+        <a class="brand" href="/" aria-label="ghostanalytics home">
+          <span class="brand-mark">g</span>
+          <span class="brand-name">ghostanalytics</span>
+        </a>
+        <span>No cookies. No personal data. Powered by Stacks and SingleStore.</span>
+      </div>
+    </footer>
+  </body>
+</html>

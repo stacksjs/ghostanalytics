@@ -1,0 +1,154 @@
+<script server>
+const clients = [
+  { step: 'northwind.co', n: '12,480', pct: 100 },
+  { step: 'lumen-studio.com', n: '7,920', pct: 63 },
+  { step: 'harbor-goods.shop', n: '5,140', pct: 41 },
+  { step: 'field-notes.blog', n: '3,260', pct: 26 },
+]
+</script>
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Analytics for agencies - ghostanalytics</title>
+    <meta name="description" content="Cookieless analytics for agencies and freelancers. Manage every client site from one clean dashboard, share reports in a link, and skip the per-client GA and consent setup. Powered by ghostanalytics.">
+    <meta name="theme-color" content="#0a0c0e">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap">
+    <link rel="stylesheet" href="/marketing.css">
+  </head>
+  <body>
+    @include('site-nav')
+
+    <main>
+      <nav class="subnav shell" aria-label="Breadcrumb">
+        <a href="/">Home</a><span class="sep">/</span>
+        <a href="/use-cases" data-no-router>Use cases</a><span class="sep">/</span>
+        <span>Agencies</span>
+      </nav>
+
+      <section class="hero shell">
+        <div>
+          <p class="eyebrow enter">For agencies</p>
+          <h1 class="hero-title enter d1">Every client site, one clean dashboard.</h1>
+          <p class="hero-sub enter d2">
+            Add a site in seconds, track them all from one login, and share a report your client can read without a walkthrough. No per-client GA project, no consent banner to wrangle.
+          </p>
+          <div class="hero-actions enter d3">
+            <a class="btn primary" href="/#install">Get your script tag</a>
+            <a class="btn ghost" href="/dashboard">See a live dashboard</a>
+          </div>
+        </div>
+
+        <aside class="panel enter d2" aria-label="Sample client sites">
+          <div class="panel-head">
+            <span class="live">Client sites, visitors this month</span>
+            <span class="panel-tag">Sample data</span>
+          </div>
+          <div class="top-pages" style="margin-top:1.2rem;gap:0.9rem;">
+            @foreach (clients as c)
+              <div>
+                <div class="top-row" style="margin-bottom:0.4rem;">
+                  <span class="path" style="font-family:var(--sans);color:var(--ink);">{{ c.step }}</span>
+                  <span class="count">{{ c.n }}</span>
+                </div>
+                <span class="bar" style="display:block;width:100%;height:8px;"><span style="width: {{ c.pct }}%"></span></span>
+              </div>
+            @endforeach
+          </div>
+        </aside>
+      </section>
+
+      <section class="section shell reveal" aria-label="One dashboard, every client">
+        <div class="split">
+          <div class="split-text">
+            <h3>Stop juggling a login for every client.</h3>
+            <p>
+              One account holds every site you run. Switch between clients from a single menu, keep their numbers separate, and never set up another GA4 property or Consent Mode config again.
+            </p>
+            <ul class="mini-list">
+              <li><span class="dot" aria-hidden="true"></span>Add a new client site with one script tag and a name.</li>
+              <li><span class="dot" aria-hidden="true"></span>No cookie banner to configure on each site you touch.</li>
+              <li><span class="dot" aria-hidden="true"></span>One-click GA import to bring an inherited account across.</li>
+            </ul>
+          </div>
+          <aside class="panel" aria-label="Sample traffic for one client site">
+            <div class="panel-head">
+              <span class="live">Top pages, northwind.co</span>
+              <span class="panel-tag">Sample data</span>
+            </div>
+            <div class="top-pages" style="margin-top:1.1rem;">
+              <div class="top-row"><span class="path">/</span><span class="bar"><span style="width:100%"></span></span><span class="count">4,210</span></div>
+              <div class="top-row"><span class="path">/services</span><span class="bar"><span style="width:58%"></span></span><span class="count">2,440</span></div>
+              <div class="top-row"><span class="path">/case-studies</span><span class="bar"><span style="width:39%"></span></span><span class="count">1,630</span></div>
+              <div class="top-row"><span class="path">/contact</span><span class="bar"><span style="width:24%"></span></span><span class="count">1,010</span></div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="section shell reveal" aria-label="Reports clients understand">
+        <div class="split rev">
+          <div class="split-text">
+            <h3>Send a report, not a login and a lesson.</h3>
+            <p>
+              Share a clean, read-only dashboard with a single link. Your client sees the numbers that matter, on your schedule, without a GA seat, a training call, or a screenshot deck stitched together the night before.
+            </p>
+            <ul class="mini-list">
+              <li><span class="dot" aria-hidden="true"></span>Shareable dashboards a non-technical client can actually read.</li>
+              <li><span class="dot" aria-hidden="true"></span>Compare periods to show the impact of the work you shipped.</li>
+              <li><span class="dot" aria-hidden="true"></span>A privacy story you can put in front of any client legal team.</li>
+            </ul>
+          </div>
+          <aside class="panel" aria-label="Sample month over month result">
+            <div class="panel-head">
+              <span class="live">Visitors vs last month</span>
+              <span class="panel-tag">Sample data</span>
+            </div>
+            <div class="metrics" style="margin-top:1.1rem;grid-template-columns:1fr 1fr;gap:1.25rem 1.5rem;">
+              <div class="metric"><div class="m-value">+38%</div><div class="m-label">Visitors</div></div>
+              <div class="metric"><div class="m-value">+22%</div><div class="m-label">Conversions</div></div>
+              <div class="metric"><div class="m-value">4.9k</div><div class="m-label">From organic</div></div>
+              <div class="metric"><div class="m-value">2m 41s</div><div class="m-label">Avg. time on site</div></div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="section shell reveal" aria-labelledby="agency-track">
+        <div class="section-head">
+          <h2 id="agency-track" class="section-title">Built for the way agencies work.</h2>
+          <p class="section-intro">The parts that turn analytics from a chore into a deliverable, across every account you manage.</p>
+        </div>
+        <div class="qa-grid">
+          <div class="qa"><h4>Onboard fast</h4><p>A new client is one script tag. No property setup, no consent config, no data-sharing terms to sign.</p></div>
+          <div class="qa"><h4>Hand off clean</h4><p>Move a site to the client whenever they want to own it. The data is theirs, not locked in an ad graph.</p></div>
+          <div class="qa"><h4>Report on repeat</h4><p>Share the same live link every month, so reporting is a URL, not an all-nighter in a slide tool.</p></div>
+        </div>
+      </section>
+
+      <section class="section shell reveal" aria-label="Get started">
+        <div class="cta-band">
+          <h2>Run every client site from one place.</h2>
+          <div class="cta-actions">
+            <a class="btn primary" href="/#install">Get your script tag</a>
+            <a class="btn ghost" href="/use-cases" data-no-router>All use cases</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer shell">
+      <div class="footer-bottom" style="border-top: none">
+        <a class="brand" href="/" aria-label="ghostanalytics home">
+          <span class="brand-mark">g</span>
+          <span class="brand-name">ghostanalytics</span>
+        </a>
+        <span>No cookies. No personal data. Powered by Stacks and SingleStore.</span>
+      </div>
+    </footer>
+  </body>
+</html>

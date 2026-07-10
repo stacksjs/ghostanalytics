@@ -1,0 +1,154 @@
+<script server>
+const posts = [
+  { step: 'The case against cookie banners', n: '18,410', pct: 100 },
+  { step: 'How we cut page weight in half', n: '11,240', pct: 61 },
+  { step: 'A field guide to referrers', n: '7,880', pct: 43 },
+  { step: 'Why we left Google Analytics', n: '5,120', pct: 28 },
+]
+</script>
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Analytics for blogs and publishers - ghostanalytics</title>
+    <meta name="description" content="Cookieless analytics for blogs and publishers. See which posts hold attention, which referrers send readers who stay, and keep pages fast with a script under 2 KB. Powered by ghostanalytics.">
+    <meta name="theme-color" content="#0a0c0e">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap">
+    <link rel="stylesheet" href="/marketing.css">
+  </head>
+  <body>
+    @include('site-nav')
+
+    <main>
+      <nav class="subnav shell" aria-label="Breadcrumb">
+        <a href="/">Home</a><span class="sep">/</span>
+        <a href="/use-cases" data-no-router>Use cases</a><span class="sep">/</span>
+        <span>Publishers &amp; blogs</span>
+      </nav>
+
+      <section class="hero shell">
+        <div>
+          <p class="eyebrow enter">For blogs &amp; publishers</p>
+          <h1 class="hero-title enter d1">Know what readers actually read.</h1>
+          <p class="hero-sub enter d2">
+            See your top articles, where a spike from Hacker News or Reddit came from, and how a post performs over time. All from a script under 2 KB that never slows the page down.
+          </p>
+          <div class="hero-actions enter d3">
+            <a class="btn primary" href="/#install">Get your script tag</a>
+            <a class="btn ghost" href="/dashboard">See a live dashboard</a>
+          </div>
+        </div>
+
+        <aside class="panel enter d2" aria-label="Sample top articles">
+          <div class="panel-head">
+            <span class="live">Top articles, last 30 days</span>
+            <span class="panel-tag">Sample data</span>
+          </div>
+          <div class="top-pages" style="margin-top:1.2rem;gap:0.9rem;">
+            @foreach (posts as p)
+              <div>
+                <div class="top-row" style="margin-bottom:0.4rem;">
+                  <span class="path" style="font-family:var(--sans);color:var(--ink);">{{ p.step }}</span>
+                  <span class="count">{{ p.n }}</span>
+                </div>
+                <span class="bar" style="display:block;width:100%;height:8px;"><span style="width: {{ p.pct }}%"></span></span>
+              </div>
+            @endforeach
+          </div>
+        </aside>
+      </section>
+
+      <section class="section shell reveal" aria-label="A light script keeps pages fast">
+        <div class="split">
+          <div class="split-text">
+            <h3>No ad-tech bloat weighing your pages down.</h3>
+            <p>
+              Readers leave slow pages, and search rankings follow them. ghostanalytics is a single first-party script under 2 KB, loaded once and deferred, with no gtag.js weight and no third-party fetch storm behind it.
+            </p>
+            <ul class="mini-list">
+              <li><span class="dot" aria-hidden="true"></span>Under 2 KB, deferred, and served from your own domain.</li>
+              <li><span class="dot" aria-hidden="true"></span>No cookie banner sitting on top of your reading experience.</li>
+              <li><span class="dot" aria-hidden="true"></span>Core Web Vitals beside your traffic, so a slow post stands out.</li>
+            </ul>
+          </div>
+          <aside class="panel" aria-label="Sample referrers">
+            <div class="panel-head">
+              <span class="live">Where readers arrived from</span>
+              <span class="panel-tag">Sample data</span>
+            </div>
+            <div class="top-pages" style="margin-top:1.1rem;">
+              <div class="top-row"><span class="path" style="font-family:var(--sans);">Hacker News</span><span class="bar"><span style="width:100%"></span></span><span class="count">6,120</span></div>
+              <div class="top-row"><span class="path" style="font-family:var(--sans);">Reddit</span><span class="bar"><span style="width:66%"></span></span><span class="count">4,040</span></div>
+              <div class="top-row"><span class="path" style="font-family:var(--sans);">Organic search</span><span class="bar"><span style="width:52%"></span></span><span class="count">3,180</span></div>
+              <div class="top-row"><span class="path" style="font-family:var(--sans);">Newsletter</span><span class="bar"><span style="width:34%"></span></span><span class="count">2,090</span></div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="section shell reveal" aria-label="Content performance over time">
+        <div class="split rev">
+          <div class="split-text">
+            <h3>Follow a post from launch-day spike to slow burn.</h3>
+            <p>
+              A story can peak on day one or find its audience months later. Compare periods to see whether an article keeps pulling traffic, which sources send readers who stick around, and what earns a spot in your newsletter.
+            </p>
+            <ul class="mini-list">
+              <li><span class="dot" aria-hidden="true"></span>Referrers sorted into search, social, and direct automatically.</li>
+              <li><span class="dot" aria-hidden="true"></span>Compare this week to last to catch a post finding legs.</li>
+              <li><span class="dot" aria-hidden="true"></span>One-click GA import, so your archive's history comes along.</li>
+            </ul>
+          </div>
+          <aside class="panel" aria-label="Sample engagement figures">
+            <div class="panel-head">
+              <span class="live">This post vs last month</span>
+              <span class="panel-tag">Sample data</span>
+            </div>
+            <div class="metrics" style="margin-top:1.1rem;grid-template-columns:1fr 1fr;gap:1.25rem 1.5rem;">
+              <div class="metric"><div class="m-value">3m 12s</div><div class="m-label">Avg. read time</div></div>
+              <div class="metric"><div class="m-value">41%</div><div class="m-label">Scrolled to end</div></div>
+              <div class="metric"><div class="m-value">+64%</div><div class="m-label">From social</div></div>
+              <div class="metric"><div class="m-value">1,940</div><div class="m-label">Newsletter clicks</div></div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="section shell reveal" aria-labelledby="pub-track">
+        <div class="section-head">
+          <h2 id="pub-track" class="section-title">What content teams watch.</h2>
+          <p class="section-intro">The signals that tell you what to write next, without profiling a single reader.</p>
+        </div>
+        <div class="qa-grid">
+          <div class="qa"><h4>Top articles</h4><p>Your most-read stories at a glance, so you know which topics keep earning their spot on the front page.</p></div>
+          <div class="qa"><h4>Traffic spikes</h4><p>When a link takes off on HN, Reddit, or social, see the source behind the surge in real time.</p></div>
+          <div class="qa"><h4>Engagement</h4><p>Read time and scroll depth show whether a headline delivered or just pulled a click and lost the reader.</p></div>
+        </div>
+      </section>
+
+      <section class="section shell reveal" aria-label="Get started">
+        <div class="cta-band">
+          <h2>Write for readers, measure like it.</h2>
+          <div class="cta-actions">
+            <a class="btn primary" href="/#install">Get your script tag</a>
+            <a class="btn ghost" href="/use-cases" data-no-router>All use cases</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer shell">
+      <div class="footer-bottom" style="border-top: none">
+        <a class="brand" href="/" aria-label="ghostanalytics home">
+          <span class="brand-mark">g</span>
+          <span class="brand-name">ghostanalytics</span>
+        </a>
+        <span>No cookies. No personal data. Powered by Stacks and SingleStore.</span>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,171 @@
+<script server>
+const funnel = [
+  { step: 'Visitors', n: '8,420', pct: 100 },
+  { step: 'Signups', n: '612', pct: 44 },
+  { step: 'Activated', n: '289', pct: 24 },
+]
+</script>
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Analytics for SaaS - ghostanalytics</title>
+    <meta name="description" content="Cookieless analytics for SaaS. Follow visitors from landing page to signup and activation, attribute revenue to channels, and skip the consent banner. Powered by ghostanalytics.">
+    <meta name="theme-color" content="#0a0c0e">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap">
+    <link rel="stylesheet" href="/marketing.css">
+  </head>
+  <body>
+    @include('site-nav')
+
+    <main>
+      <nav class="subnav shell" aria-label="Breadcrumb">
+        <a href="/">Home</a><span class="sep">/</span>
+        <a href="/use-cases" data-no-router>Use cases</a><span class="sep">/</span>
+        <span>SaaS</span>
+      </nav>
+
+      <section class="hero shell">
+        <div>
+          <p class="eyebrow enter">For SaaS</p>
+          <h1 class="hero-title enter d1">From first visit to activated.</h1>
+          <p class="hero-sub enter d2">
+            Track the whole SaaS funnel without a cookie banner in the way. See which pages turn visitors into signups, and which channels bring the accounts that stick.
+          </p>
+          <div class="hero-actions enter d3">
+            <a class="btn primary" href="/#install">Get your script tag</a>
+            <a class="btn ghost" href="/dashboard">See a live dashboard</a>
+          </div>
+        </div>
+
+        <aside class="panel enter d2" aria-label="Sample signup funnel">
+          <div class="panel-head">
+            <span class="live">Signup funnel, last 30 days</span>
+            <span class="panel-tag">Sample data</span>
+          </div>
+          <div class="top-pages" style="margin-top:1.2rem;gap:0.9rem;">
+            @foreach (funnel as f)
+              <div>
+                <div class="top-row" style="margin-bottom:0.4rem;">
+                  <span class="path" style="font-family:var(--sans);color:var(--ink);">{{ f.step }}</span>
+                  <span class="count">{{ f.n }}</span>
+                </div>
+                <span class="bar" style="display:block;width:100%;height:8px;"><span style="width: {{ f.pct }}%"></span></span>
+              </div>
+            @endforeach
+          </div>
+        </aside>
+      </section>
+
+      <section class="section shell reveal" aria-label="No cookie tax">
+        <div class="split">
+          <div class="split-text">
+            <h3>Measure the funnel without the cookie tax.</h3>
+            <p>
+              A consent banner costs you the first click and a slice of every measurement behind it. ghostanalytics stores nothing on the visitor, so there is no banner to show and no gap between real signups and counted ones.
+            </p>
+            <ul class="mini-list">
+              <li><span class="dot" aria-hidden="true"></span>No cookie prompt between a visitor and your call to action.</li>
+              <li><span class="dot" aria-hidden="true"></span>Every signup counted, not sampled or thresholded away.</li>
+              <li><span class="dot" aria-hidden="true"></span>Pageviews and events flow from the same lightweight script.</li>
+            </ul>
+          </div>
+          <aside class="panel" aria-label="Sample conversion by page">
+            <div class="panel-head">
+              <span class="live">Signups by landing page</span>
+              <span class="panel-tag">Sample data</span>
+            </div>
+            <div class="top-pages" style="margin-top:1.1rem;">
+              <div class="top-row"><span class="path">/pricing</span><span class="bar"><span style="width:100%"></span></span><span class="count">214</span></div>
+              <div class="top-row"><span class="path">/</span><span class="bar"><span style="width:62%"></span></span><span class="count">133</span></div>
+              <div class="top-row"><span class="path">/integrations</span><span class="bar"><span style="width:38%"></span></span><span class="count">81</span></div>
+              <div class="top-row"><span class="path">/blog/launch</span><span class="bar"><span style="width:27%"></span></span><span class="count">58</span></div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="section shell reveal" aria-label="Channel attribution">
+        <div class="split rev">
+          <div class="split-text">
+            <h3>Prove which channels bring paying users.</h3>
+            <p>
+              Tag your ads, emails, and partner links with UTM parameters and ghostanalytics carries them through to the signup event. You can tell the difference between a channel that drives traffic and one that drives revenue.
+            </p>
+            <ul class="mini-list">
+              <li><span class="dot" aria-hidden="true"></span>UTM source, medium, and campaign on every conversion.</li>
+              <li><span class="dot" aria-hidden="true"></span>Referrers classified automatically into search, social, and direct.</li>
+              <li><span class="dot" aria-hidden="true"></span>One-click GA import, so your history moves with you.</li>
+            </ul>
+          </div>
+          <aside class="panel" aria-label="Sample signups by source">
+            <div class="panel-head">
+              <span class="live">Signups by source</span>
+              <span class="panel-tag">Sample data</span>
+            </div>
+            <div class="top-pages" style="margin-top:1.1rem;">
+              <div class="top-row"><span class="path" style="font-family:var(--sans);">Organic search</span><span class="bar"><span style="width:100%"></span></span><span class="count">188</span></div>
+              <div class="top-row"><span class="path" style="font-family:var(--sans);">Product Hunt</span><span class="bar"><span style="width:54%"></span></span><span class="count">102</span></div>
+              <div class="top-row"><span class="path" style="font-family:var(--sans);">Newsletter</span><span class="bar"><span style="width:41%"></span></span><span class="count">77</span></div>
+              <div class="top-row"><span class="path" style="font-family:var(--sans);">Direct</span><span class="bar"><span style="width:29%"></span></span><span class="count">54</span></div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="section shell reveal" aria-labelledby="saas-track">
+        <div class="section-head">
+          <h2 id="saas-track" class="section-title">What SaaS teams track.</h2>
+          <p class="section-intro">The events that matter for a product-led funnel, each one a single function call.</p>
+        </div>
+        <div class="qa-grid">
+          <div class="qa"><h4>Signup started</h4><p>Fire when the form opens to measure intent, not just completed accounts.</p></div>
+          <div class="qa"><h4>Account created</h4><p>Your headline conversion, attributed back to the exact source and campaign.</p></div>
+          <div class="qa"><h4>Activated</h4><p>The first real action that predicts retention, tracked as its own goal.</p></div>
+        </div>
+      </section>
+
+      <section class="section shell-narrow reveal" aria-labelledby="saas-code">
+        <div class="section-head">
+          <h2 id="saas-code" class="section-title">A conversion is one line.</h2>
+          <p class="section-intro">No SDK and no init call. Fire an event from anywhere in your app, with any properties you want to break it down by later.</p>
+        </div>
+        <div class="code-grid">
+          <div class="code">
+            <div class="code-bar"><span>onboarding.ts</span><span>JavaScript</span></div>
+            <pre><span class="cmt">// when the account is created</span>
+<span class="tok">ghost</span>('signup', { plan: 'pro', source: 'product-hunt' })
+
+<span class="cmt">// later, when they reach the aha moment</span>
+<span class="tok">ghost</span>('activated', { plan: 'pro' })</pre>
+          </div>
+        </div>
+        <p class="code-note">The <code>ghost()</code> function ships with the tracking script, so there is nothing extra to import. Properties become filters and breakdowns in your dashboard, and the beacon <code>POST</code>s to your own <code>/collect</code> endpoint.</p>
+      </section>
+
+      <section class="section shell reveal" aria-label="Get started">
+        <div class="cta-band">
+          <h2>Grow the funnel, not your compliance risk.</h2>
+          <div class="cta-actions">
+            <a class="btn primary" href="/#install">Get your script tag</a>
+            <a class="btn ghost" href="/use-cases" data-no-router>All use cases</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer shell">
+      <div class="footer-bottom" style="border-top: none">
+        <a class="brand" href="/" aria-label="ghostanalytics home">
+          <span class="brand-mark">g</span>
+          <span class="brand-name">ghostanalytics</span>
+        </a>
+        <span>No cookies. No personal data. Powered by Stacks and SingleStore.</span>
+      </div>
+    </footer>
+  </body>
+</html>
