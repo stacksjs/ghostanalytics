@@ -14,6 +14,8 @@ const range = query.get('range') || '1y'
 const days = range === '30d' ? 30 : range === '90d' ? 90 : range === '1y' ? 365 : 7
 const from = new Date(Date.now() - days * 864e5).toISOString()
 const to = new Date().toISOString()
+// Last ~5 minutes; ISO string compares lexicographically against the ISO timestamp column.
+const liveFrom = new Date(Date.now() - 5 * 60 * 1000).toISOString()
 
 const ranges = [
   { key: '7d', label: '7 days' },
@@ -30,11 +32,13 @@ let countries = []
 let devices = []
 let browsers = []
 let systems = []
+let channelRows = []
 let bounceRate = 0
 let prevViews = 0
 let prevVisitors = 0
 let prevSessions = 0
 let prevBounce = 0
+let liveNow = 0
 let live = false
 
 // Race all DB work against a short timeout: if SingleStore isn't reachable, a
@@ -57,11 +61,14 @@ async function loadData() {
     `SELECT COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors, COUNT(DISTINCT session_id) AS sessions FROM page_views WHERE ${filter}`, p))?.[0]
   kpis = { views: Number(row?.views ?? 0), visitors: Number(row?.visitors ?? 0), sessions: Number(row?.sessions ?? 0) }
   series = (await db.unsafe(
-    `SELECT LEFT(timestamp, 10) AS day, COUNT(*) AS views FROM page_views WHERE ${filter} GROUP BY LEFT(timestamp, 10) ORDER BY day ASC`, p)) ?? []
+    `SELECT LEFT(timestamp, 10) AS day, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors FROM page_views WHERE ${filter} GROUP BY LEFT(timestamp, 10) ORDER BY day ASC`, p)) ?? []
   pages = (await db.unsafe(
     `SELECT path, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors FROM page_views WHERE ${filter} GROUP BY path ORDER BY views DESC LIMIT 8`, p)) ?? []
   referrers = (await db.unsafe(
     `SELECT referrer_source AS source, COUNT(*) AS views FROM page_views WHERE ${filter} GROUP BY referrer_source ORDER BY views DESC LIMIT 8`, p)) ?? []
+  // All sources (no LIMIT) so each can be folded into a channel below.
+  channelRows = (await db.unsafe(
+    `SELECT referrer_source AS source, COUNT(*) AS views FROM page_views WHERE ${filter} GROUP BY referrer_source`, p)) ?? []
   countries = (await db.unsafe(
     `SELECT country, COUNT(*) AS views FROM page_views WHERE ${filter} AND country IS NOT NULL AND country != '' GROUP BY country ORDER BY views DESC LIMIT 8`, p)) ?? []
   devices = (await db.unsafe(
@@ -78,14 +85,21 @@ async function loadData() {
   // Previous period (same length, immediately before) for trend deltas.
   const prevFrom = new Date(new Date(from).getTime() - days * 864e5).toISOString()
   const pp = [siteId, prevFrom, from]
+  // Strict upper bound so the boundary instant `from` belongs to the current period only.
+  const filterPrev = 'site_id = ? AND timestamp >= ? AND timestamp < ?'
   const prow = (await db.unsafe(
-    `SELECT COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors, COUNT(DISTINCT session_id) AS sessions FROM page_views WHERE ${filter}`, pp))?.[0]
+    `SELECT COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors, COUNT(DISTINCT session_id) AS sessions FROM page_views WHERE ${filterPrev}`, pp))?.[0]
   prevViews = Number(prow?.views ?? 0)
   prevVisitors = Number(prow?.visitors ?? 0)
   prevSessions = Number(prow?.sessions ?? 0)
   const pb = (await db.unsafe(
-    `SELECT COUNT(*) AS sessions, SUM(pv = 1) AS bounced FROM (SELECT session_id, COUNT(*) AS pv FROM page_views WHERE ${filter} GROUP BY session_id) t`, pp))?.[0]
+    `SELECT COUNT(*) AS sessions, SUM(pv = 1) AS bounced FROM (SELECT session_id, COUNT(*) AS pv FROM page_views WHERE ${filterPrev} GROUP BY session_id) t`, pp))?.[0]
   prevBounce = Number(pb?.sessions) ? Math.round((Number(pb.bounced) / Number(pb.sessions)) * 100) : 0
+  // Unique visitors in the last ~5 minutes (reuses the resolved siteId).
+  const lv = (await db.unsafe(
+    `SELECT COUNT(DISTINCT visitor_id) AS current FROM page_views WHERE site_id = ? AND timestamp >= ?`,
+    [siteId, liveFrom]))?.[0]
+  liveNow = Number(lv?.current ?? 0)
   live = true
 }
 
@@ -98,6 +112,7 @@ try {
     series = preloaded.series ?? []
     pages = preloaded.pages ?? []
     referrers = preloaded.referrers ?? []
+    channelRows = preloaded.channelRows ?? []
     countries = preloaded.countries ?? []
     devices = preloaded.devices ?? []
     browsers = preloaded.browsers ?? []
@@ -107,6 +122,7 @@ try {
     prevVisitors = preloaded.prevVisitors ?? 0
     prevSessions = preloaded.prevSessions ?? 0
     prevBounce = preloaded.prevBounce ?? 0
+    liveNow = preloaded.liveNow ?? 0
     live = true
   }
   else {
@@ -121,13 +137,35 @@ catch {
   live = false
 }
 
-const maxViews = series.reduce((m, s) => Math.max(m, Number(s.views || 0)), 0) || 1
 const maxPage = pages.reduce((m, p) => Math.max(m, Number(p.views || 0)), 0) || 1
 const maxRef = referrers.reduce((m, r) => Math.max(m, Number(r.views || 0)), 0) || 1
 const maxCountry = countries.reduce((m, c) => Math.max(m, Number(c.views || 0)), 0) || 1
 const maxDevice = devices.reduce((m, d) => Math.max(m, Number(d.views || 0)), 0) || 1
 const maxBrowser = browsers.reduce((m, b) => Math.max(m, Number(b.views || 0)), 0) || 1
 const maxSystem = systems.reduce((m, s) => Math.max(m, Number(s.views || 0)), 0) || 1
+
+// Fold app-classified referrer_source strings into 4 channels, sum views, sort desc.
+const CH_SEARCH = new Set(['google', 'bing', 'duckduckgo', 'yahoo', 'baidu', 'ecosia'])
+const CH_SOCIAL = new Set(['twitter', 'x', 'facebook', 'instagram', 'linkedin', 'reddit', 'hacker news', 'youtube', 'mastodon', 'bluesky', 'tiktok'])
+function channelOf(src) {
+  const s = String(src ?? '').trim().toLowerCase()
+  if (!s || s === 'direct')
+    return 'Direct'
+  if (CH_SEARCH.has(s))
+    return 'Search'
+  if (CH_SOCIAL.has(s))
+    return 'Social'
+  return 'Referral'
+}
+const channelTotals = { Search: 0, Social: 0, Direct: 0, Referral: 0 }
+for (const r of channelRows)
+  channelTotals[channelOf(r.source)] += Number(r.views || 0)
+const channels = Object.keys(channelTotals)
+  .map(name => ({ name, views: channelTotals[name] }))
+  .filter(c => c.views > 0)
+  .sort((a, b) => b.views - a.views)
+const maxChannel = channels.reduce((m, c) => Math.max(m, c.views), 0) || 1
+const channelTotal = channels.reduce((s, c) => s + c.views, 0) || 1
 
 // Country code -> flag emoji (regional-indicator letters); empty for non-2-letter values.
 function flag(code) {
@@ -152,6 +190,83 @@ const kpiCards = [
   { label: 'Bounce rate', value: `${bounceRate}%`, delta: pct(bounceRate, prevBounce), goodUp: false },
   { label: 'Views / visitor', value: kpis.visitors ? curVpv.toFixed(1) : '0.0', delta: pct(curVpv, prevVpv), goodUp: true },
 ]
+
+// Area+line timeseries geometry over a fixed 1000x200 viewBox. padX is 0 so a point's
+// x-fraction (x/1000) equals its hover column's center fraction ((i+0.5)/n); with
+// preserveAspectRatio="none" the HTML overlay dots line up with the SVG line. views >=
+// visitors always (distinct visitors of a day <= that day's page views), so one shared
+// max scale keeps the visitors line at or below the views area.
+const CHART = { w: 1000, h: 200, padX: 0, padT: 14, padB: 12 }
+function buildChart(rows) {
+  const n = rows.length
+  const innerW = CHART.w - CHART.padX * 2
+  const top = CHART.padT
+  const plotH = CHART.h - CHART.padT - CHART.padB
+  const bottom = top + plotH
+  const max = rows.reduce((m, r) => Math.max(m, Number(r.views || 0)), 0) || 1
+  const xFor = i => CHART.padX + ((i + 0.5) / n) * innerW
+  const yFor = v => top + (1 - Number(v || 0) / max) * plotH
+  const pts = rows.map((r, i) => {
+    const views = Number(r.views || 0)
+    const visitors = Number(r.visitors || 0)
+    return {
+      day: r.day,
+      views,
+      visitors,
+      x: xFor(i),
+      vy: yFor(views),
+      uy: yFor(visitors),
+      viewsTopPct: (yFor(views) / CHART.h) * 100,
+      visTopPct: (yFor(visitors) / CHART.h) * 100,
+    }
+  })
+  const line = key => pts.map((pt, i) => `${i ? 'L' : 'M'}${pt.x.toFixed(1)} ${pt[key].toFixed(1)}`).join(' ')
+  const area = pts.length
+    ? `M${pts[0].x.toFixed(1)} ${bottom} L${pts.map(pt => `${pt.x.toFixed(1)} ${pt.vy.toFixed(1)}`).join(' L')} L${pts[pts.length - 1].x.toFixed(1)} ${bottom} Z`
+    : ''
+  return { pts, viewsLine: line('vy'), visitorsLine: line('uy'), area, bottom, firstDay: pts[0]?.day, lastDay: pts[pts.length - 1]?.day, ...CHART }
+}
+// Fill every calendar day in the range so the x-axis is time-proportional: days
+// with no traffic become 0 (a 6-month gap no longer looks like a 1-day gap), and
+// a single active day still draws a full-width baseline instead of an invisible point.
+function densify(rows, fromISO, toISO) {
+  const byDay = new Map(rows.map(r => [r.day, r]))
+  const out = []
+  let d = new Date(`${fromISO.slice(0, 10)}T00:00:00Z`)
+  const end = new Date(`${toISO.slice(0, 10)}T00:00:00Z`)
+  for (; d <= end; d = new Date(d.getTime() + 864e5)) {
+    const day = d.toISOString().slice(0, 10)
+    const r = byDay.get(day)
+    out.push({ day, views: r ? Number(r.views || 0) : 0, visitors: r ? Number(r.visitors || 0) : 0 })
+  }
+  return out
+}
+const chart = buildChart(densify(series, from, to))
+
+// CSV export payload. Serialize the already-loaded view (no extra query). Every "<" is
+// escaped to < so the embedded JSON can never form a stray closing script tag.
+const exportPayload = {
+  site: siteId,
+  range,
+  days,
+  generatedAt: to,
+  kpis: {
+    visitors: kpis.visitors,
+    views: kpis.views,
+    sessions: kpis.sessions,
+    bounceRate,
+    viewsPerVisitor: kpis.visitors ? Number(curVpv.toFixed(2)) : 0,
+  },
+  series: series.map(s => ({ day: s.day, views: Number(s.views || 0), visitors: Number(s.visitors || 0) })),
+  pages: pages.map(p => ({ path: p.path, views: Number(p.views || 0), visitors: Number(p.visitors || 0) })),
+  referrers: referrers.map(r => ({ source: r.source, views: Number(r.views || 0) })),
+  channels: channels.map(c => ({ channel: c.name, views: c.views })),
+  countries: countries.map(c => ({ country: c.country, views: Number(c.views || 0) })),
+  devices: devices.map(d => ({ device: d.device, views: Number(d.views || 0) })),
+  browsers: browsers.map(b => ({ browser: b.browser, views: Number(b.views || 0) })),
+  systems: systems.map(s => ({ os: s.os, views: Number(s.views || 0) })),
+}
+const exportJson = JSON.stringify(exportPayload)
 </script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -186,6 +301,29 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
 .reveal { opacity: 0; transform: translateY(10px); animation: reveal 0.5s cubic-bezier(0.16,1,0.3,1) forwards; }
 @keyframes reveal { to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .bar, .reveal { animation: none; opacity: 1; transform: none; } }
+
+/* Live "current visitors" badge: expanding halo ring behind the dot (only when > 0). */
+.live-dot::after { content: ''; position: absolute; inset: 0; border-radius: 999px; background: var(--accent); animation: livepulse 2s cubic-bezier(0.16,1,0.3,1) infinite; }
+@keyframes livepulse { 0% { transform: scale(1); opacity: 0.55; } 100% { transform: scale(2.8); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .live-dot::after { animation: none; opacity: 0; } }
+
+/* Timeseries area+line chart: CSS-only hover tooltips + markers. Columns are transparent
+  full-height hover targets; dots align to the SVG line via the same (i+0.5)/n center fraction. */
+.ga-col:hover::before { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--border); pointer-events: none; }
+.ga-dot { position: absolute; left: 50%; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; border-radius: 999px; box-shadow: 0 0 0 3px var(--panel); opacity: 0; transition: opacity 0.12s ease; pointer-events: none; }
+.ga-dot-v { background: var(--accent); }
+.ga-dot-u { background: var(--text-3); }
+.ga-col:hover .ga-dot { opacity: 1; }
+.ga-tip { position: absolute; left: 50%; transform: translateX(-50%) translateY(calc(-100% - 12px)); min-width: 124px; padding: 8px 10px; border-radius: 9px; background: var(--panel); border: 1px solid var(--border); box-shadow: 0 8px 24px rgba(0,0,0,0.14); opacity: 0; visibility: hidden; transition: opacity 0.12s ease; pointer-events: none; z-index: 20; }
+.ga-col:hover .ga-tip { opacity: 1; visibility: visible; }
+.ga-tip-day { font-size: 11px; color: var(--text-2); margin-bottom: 5px; }
+.ga-tip-row { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2); white-space: nowrap; line-height: 1.7; }
+.ga-tip-row b { margin-left: auto; color: var(--text); font-weight: 600; }
+.ga-sw { display: inline-block; width: 8px; height: 8px; border-radius: 2px; }
+@media (prefers-reduced-motion: reduce) { .ga-dot, .ga-tip { transition: none; } }
+
+/* Export CSV pill: hover tightens the border to the accent like the range pills. */
+#export-csv:hover { color: var(--text); border-color: var(--accent); }
 </style>
 
 <div class="px-5 py-10 md:px-10 min-h-[100dvh]">
@@ -197,6 +335,11 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
         <p class="mt-2 text-sm" style="color: var(--text-3)">
           Site <span class="mono" style="color: var(--text-2)">{{ siteId }}</span> · last {{ days }} days
         </p>
+        <div class="inline-flex gap-2 items-center mt-3 px-2.5 py-1 border pill reveal" style="border-color: var(--border)">
+          <span class="{{ liveNow ? 'live-dot' : '' }}" style="position: relative; display: inline-block; width: 7px; height: 7px; border-radius: 999px; background: {{ liveNow ? 'var(--accent)' : 'var(--text-3)' }};"></span>
+          <span class="font-semibold text-xs mono" style="color: {{ liveNow ? 'var(--text)' : 'var(--text-3)' }}">{{ liveNow }}</span>
+          <span class="text-xs" style="color: var(--text-3)">current {{ liveNow === 1 ? 'visitor' : 'visitors' }}</span>
+        </div>
       </div>
       <nav class="flex gap-1.5 items-center">
         @foreach (ranges as r)
@@ -204,6 +347,9 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
             class="px-3.5 py-1.5 font-medium text-sm border pill"
             style="{{ r.key === range ? 'color: #fff; background: var(--accent); border-color: var(--accent)' : 'color: var(--text-2); border-color: var(--border)' }}">{{ r.label }}</a>
         @endforeach
+        <button type="button" id="export-csv"
+          class="px-3.5 py-1.5 font-medium text-sm border pill"
+          style="color: var(--text-2); border-color: var(--border); background: var(--panel); cursor: pointer;">Export CSV</button>
       </nav>
     </header>
 
@@ -230,20 +376,49 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       @endforeach
     </div>
 
-    <!-- Timeseries -->
+    <!-- Timeseries: page views (area) + unique visitors (line) -->
     <div class="mb-6 p-5 panel reveal">
-      <h2 class="mb-5 font-semibold text-xs tracking-wider uppercase" style="color: var(--text-3)">Page views over time</h2>
+      <div class="flex flex-wrap gap-3 items-center justify-between mb-5">
+        <h2 class="font-semibold text-xs tracking-wider uppercase" style="color: var(--text-3)">Traffic over time</h2>
+        <div class="flex gap-4 items-center text-xs" style="color: var(--text-2)">
+          <span class="flex gap-1.5 items-center"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--accent)"></span>Views</span>
+          <span class="flex gap-1.5 items-center"><span style="display:inline-block;width:14px;height:0;border-top:2px solid var(--text-3)"></span>Visitors</span>
+        </div>
+      </div>
       @if (series.length)
-        <div class="flex gap-1 items-end h-40">
-          @foreach (series as point)
-            <div class="flex-1 group">
-              <div class="w-full rounded-t bar" title="{{ point.day }}: {{ point.views }}"
-                  style="height: {{ Math.max(2, Math.round((Number(point.views) / maxViews) * 150)) }}px; background: var(--accent);"></div>
-            </div>
-          @endforeach
+        <div class="relative h-44 w-full ga-chart">
+          <svg class="block h-full w-full" role="img" aria-label="Traffic over time from {{ chart.firstDay }} to {{ chart.lastDay }}: {{ kpis.views.toLocaleString() }} page views, {{ kpis.visitors.toLocaleString() }} unique visitors. Per-day figures are in the CSV export." viewBox="0 0 {{ chart.w }} {{ chart.h }}" preserveAspectRatio="none" style="overflow: visible">
+            <defs>
+              <linearGradient id="ga-fill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.22"/>
+                <stop offset="100%" stop-color="var(--accent)" stop-opacity="0.02"/>
+              </linearGradient>
+            </defs>
+            <path d="{{ chart.area }}" fill="url(#ga-fill)"/>
+            <path d="{{ chart.viewsLine }}" fill="none" stroke="var(--accent)" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/>
+            <path d="{{ chart.visitorsLine }}" fill="none" stroke="var(--text-3)" stroke-width="1.5" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/>
+          </svg>
+          <!-- CSS-only hover: one transparent full-height column per day -->
+          <div class="flex absolute inset-0">
+            @foreach (chart.pts as pt)
+              <div class="relative flex-1 ga-col">
+                <span class="ga-dot ga-dot-v" style="top: {{ pt.viewsTopPct }}%"></span>
+                <span class="ga-dot ga-dot-u" style="top: {{ pt.visTopPct }}%"></span>
+                <div class="ga-tip" style="top: {{ pt.viewsTopPct }}%">
+                  <div class="ga-tip-day mono">{{ pt.day }}</div>
+                  <div class="ga-tip-row"><span class="ga-sw" style="background: var(--accent)"></span>Views <b class="mono">{{ pt.views.toLocaleString() }}</b></div>
+                  <div class="ga-tip-row"><span class="ga-sw" style="background: var(--text-3)"></span>Visitors <b class="mono">{{ pt.visitors.toLocaleString() }}</b></div>
+                </div>
+              </div>
+            @endforeach
+          </div>
+        </div>
+        <div class="flex justify-between mt-2 text-xs mono" style="color: var(--text-3)">
+          <span>{{ chart.firstDay }}</span>
+          <span>{{ chart.lastDay }}</span>
         </div>
       @else
-        <div class="flex items-center justify-center h-40 text-sm" style="color: var(--text-3)">No page views in this range yet.</div>
+        <div class="flex items-center justify-center h-44 text-sm" style="color: var(--text-3)">No page views in this range yet.</div>
       @endif
     </div>
 
@@ -337,12 +512,34 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       </div>
     </div>
 
+    <!-- Referrer channels: Search / Social / Direct / Referral -->
+    <div class="mt-6 p-5 panel reveal">
+      <h2 class="mb-4 font-semibold text-xs tracking-wider uppercase" style="color: var(--text-3)">Referrer channels</h2>
+      @forelse (channels as c)
+        <div class="flex relative items-center justify-between py-2.5 text-sm">
+          <div class="absolute inset-y-1 left-0 rounded" style="width: {{ Math.round((Number(c.views) / maxChannel) * 100) }}%; background: var(--bar);"></div>
+          <span class="relative pr-2 truncate" style="color: var(--text-2)">{{ c.name }}</span>
+          <span class="flex relative gap-2.5 items-baseline">
+            <span class="tabular-nums mono" style="color: var(--text-3)">{{ Math.round((Number(c.views) / channelTotal) * 100) || (c.views ? '<1' : '0') }}%</span>
+            <span class="font-medium tabular-nums mono">{{ Number(c.views).toLocaleString() }}</span>
+          </span>
+        </div>
+      @empty
+        <div class="py-8 text-center text-sm" style="color: var(--text-3)">No channel data yet.</div>
+      @endforelse
+    </div>
+
     <footer class="mt-12 text-center text-xs" style="color: var(--text-3)">
       Privacy-first, cookieless analytics on Stacks and SingleStore. <span class="mono">ghostanalytics.org</span>
     </footer>
 
   </div>
 </div>
+
+<!-- View data for client-side CSV export, embedded as an HTML-escaped attribute.
+    {{ }} escapes it for the attribute; the DOM decodes it on read, then JSON.parse
+    restores the object. Robust across stx's script-tag handling. -->
+<div id="export-data" data-export="{{ exportJson }}" hidden></div>
 
 <!-- Client auth guard: redirect to /login when there is no token, and add a
     logout control. Plain pass-through script (stx client hydration is not
@@ -380,5 +577,67 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       }
     })
     .catch(function () {})
+
+  // CSV export: read the embedded view JSON and download a multi-section CSV
+  // (no server round-trip). Runs after the token guard above, which is fine.
+  var exportEl = document.getElementById('export-data')
+  var exportBtn = document.getElementById('export-csv')
+  if (exportEl && exportBtn) {
+    var data = null
+    try { data = JSON.parse(exportEl.getAttribute('data-export')) }
+    catch (_) { data = null }
+    var cell = function (v) {
+      var s = v == null ? '' : String(v)
+      // Formula-guard: a value starting with = + - @ (or a leading tab/CR) is run
+      // as a formula by Excel/Sheets. Paths/referrers are visitor-controlled, so
+      // neutralize with a leading apostrophe before quoting (CWE-1236).
+      if (/^[=+\-@\t\r]/.test(s))
+        s = "'" + s
+      if (s.indexOf('"') < 0 && s.indexOf(',') < 0 && s.indexOf('\n') < 0 && s.indexOf('\r') < 0)
+        return s
+      return '"' + s.split('"').join('""') + '"'
+    }
+    var row = function (cells) { return cells.map(cell).join(',') }
+    var section = function (L, header, items, pick) {
+      L.push(row(header))
+      items.forEach(function (it) { L.push(row(pick(it))) })
+      L.push('')
+    }
+    exportBtn.addEventListener('click', function () {
+      if (!data)
+        return
+      var L = []
+      L.push(row(['ghostanalytics export']))
+      L.push(row(['Site', data.site]))
+      L.push(row(['Range', data.range]))
+      L.push(row(['Generated', data.generatedAt]))
+      L.push('')
+      L.push(row(['Metric', 'Value']))
+      L.push(row(['Unique visitors', data.kpis.visitors]))
+      L.push(row(['Page views', data.kpis.views]))
+      L.push(row(['Sessions', data.kpis.sessions]))
+      L.push(row(['Bounce rate %', data.kpis.bounceRate]))
+      L.push(row(['Views per visitor', data.kpis.viewsPerVisitor]))
+      L.push('')
+      section(L, ['Date', 'Views', 'Visitors'], data.series, function (r) { return [r.day, r.views, r.visitors] })
+      section(L, ['Top page', 'Views', 'Visitors'], data.pages, function (r) { return [r.path, r.views, r.visitors] })
+      section(L, ['Top source', 'Views'], data.referrers, function (r) { return [r.source, r.views] })
+      section(L, ['Channel', 'Views'], data.channels, function (r) { return [r.channel, r.views] })
+      section(L, ['Country', 'Views'], data.countries, function (r) { return [r.country, r.views] })
+      section(L, ['Device', 'Views'], data.devices, function (r) { return [r.device, r.views] })
+      section(L, ['Browser', 'Views'], data.browsers, function (r) { return [r.browser, r.views] })
+      section(L, ['Operating system', 'Views'], data.systems, function (r) { return [r.os, r.views] })
+      var csv = '﻿' + L.join('\r\n')
+      var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+      var url = URL.createObjectURL(blob)
+      var a = document.createElement('a')
+      a.href = url
+      a.download = 'ghostanalytics-' + data.site + '-' + data.range + '.csv'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      setTimeout(function () { URL.revokeObjectURL(url) }, 1000)
+    })
+  }
 })()
 </script>
