@@ -124,6 +124,7 @@ let prevVisitors = 0
 let prevSessions = 0
 let prevBounce = 0
 let liveNow = 0
+let goals = []
 let live = false
 
 // Race all DB work against a short timeout: if SingleStore isn't reachable, a
@@ -191,6 +192,22 @@ async function loadData() {
     `SELECT COUNT(DISTINCT visitor_id) AS current FROM page_views WHERE site_id = ? AND timestamp >= ?${filterSql}`,
     [siteId, liveFrom, ...filterParams]))?.[0]
   liveNow = Number(lv?.current ?? 0)
+  // Goals for this site: per active goal, conversions in [from,to], distinct
+  // converting visitors, and total value. LEFT JOIN so goals with zero in-range
+  // conversions still return a row (0s). Scoped by site+range only — NOT the
+  // page_views filter engine, whose columns (country/device/os/utm_medium/channel)
+  // don't exist on the conversions table. Rate denominator (below) uses
+  // kpis.visitors, which does honor filterSql. duration_minutes goals: future.
+  goals = (await db.unsafe(
+    `SELECT g.id, g.name AS name, g.value AS goal_value,
+            COUNT(c.id) AS conversions,
+            COUNT(DISTINCT c.visitor_id) AS converters,
+            COALESCE(SUM(c.value), 0) AS total_value
+    FROM goals g
+    LEFT JOIN conversions c ON c.goal_id = g.id AND c.timestamp >= ? AND c.timestamp <= ?
+    WHERE g.site_id = ? AND g.is_active = 1
+    GROUP BY g.id, g.name, g.value
+    ORDER BY conversions DESC, g.name ASC`, [from, to, siteId])) ?? []
   live = true
 }
 
@@ -217,6 +234,7 @@ try {
     prevSessions = preloaded.prevSessions ?? 0
     prevBounce = preloaded.prevBounce ?? 0
     liveNow = preloaded.liveNow ?? 0
+    goals = preloaded.goals ?? []
     live = true
   }
   else {
@@ -240,6 +258,14 @@ const maxSystem = systems.reduce((m, s) => Math.max(m, Number(s.views || 0)), 0)
 const maxCampaign = campaigns.reduce((m, c) => Math.max(m, Number(c.views || 0)), 0) || 1
 const maxUtmSource = utmSources.reduce((m, s) => Math.max(m, Number(s.views || 0)), 0) || 1
 const maxUtmMedium = utmMediums.reduce((m, u) => Math.max(m, Number(u.views || 0)), 0) || 1
+// Goals: bar is scaled to the busiest goal's conversion count; rate uses the
+// range-wide distinct-visitor total (kpis.visitors), guarded against /0.
+const maxGoal = goals.reduce((m, g) => Math.max(m, Number(g.conversions || 0)), 0) || 1
+function goalRate(converters) {
+  if (!kpis.visitors)
+    return 0
+  return (Number(converters || 0) / kpis.visitors) * 100
+}
 
 // Fold app-classified referrer_source strings into 4 channels, sum views, sort desc.
 // CH_SEARCH/CH_SOCIAL are defined up top (in the filter engine) so both share one set.
@@ -364,6 +390,7 @@ const exportPayload = {
   campaigns: campaigns.map(c => ({ campaign: c.campaign, views: Number(c.views || 0) })),
   utmSources: utmSources.map(s => ({ source: s.source, views: Number(s.views || 0) })),
   utmMediums: utmMediums.map(m => ({ medium: m.medium, views: Number(m.views || 0) })),
+  goals: goals.map(g => ({ name: g.name, conversions: Number(g.conversions || 0), converters: Number(g.converters || 0), rate: Number(goalRate(g.converters).toFixed(2)), value: Number(g.total_value || 0) })),
 }
 const exportJson = JSON.stringify(exportPayload)
 </script>
@@ -658,6 +685,26 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       @endforelse
     </div>
 
+    <!-- Goals & conversions: per active goal in range — conversions (with a
+        proportion bar), conversion rate (converters / distinct visitors), and
+        total value. Empty by default (no goals seeded) → "No goals yet." -->
+    <div class="mt-6 p-5 panel reveal">
+      <h2 class="mb-4 font-semibold text-xs tracking-wider uppercase" style="color: var(--text-3)">Goals</h2>
+      @forelse (goals as g)
+        <div class="flex relative items-center justify-between -mx-1 px-1 py-2.5 text-sm">
+          <div class="absolute inset-y-1 left-0 rounded" style="width: {{ Math.round((Number(g.conversions) / maxGoal) * 100) }}%; background: var(--bar);"></div>
+          <span class="relative pr-2 truncate ga-row-label" style="color: var(--text-2)">{{ g.name }}</span>
+          <span class="flex relative gap-3.5 items-baseline">
+            <span class="tabular-nums mono" style="color: var(--text-3)">${{ Number(g.total_value).toLocaleString() }}</span>
+            <span class="tabular-nums mono" style="color: var(--text-3)">{{ Math.round(goalRate(g.converters)) || (Number(g.converters) ? '<1' : '0') }}%</span>
+            <span class="font-medium tabular-nums mono">{{ Number(g.conversions).toLocaleString() }}</span>
+          </span>
+        </div>
+      @empty
+        <div class="py-8 text-center text-sm" style="color: var(--text-3)">No goals yet.</div>
+      @endforelse
+    </div>
+
     <!-- Campaigns (UTM): full-width Top campaigns + a 2-up grid of UTM sources / mediums -->
     <div class="mt-6 p-5 panel reveal">
       <h2 class="mb-4 font-semibold text-xs tracking-wider uppercase" style="color: var(--text-3)">Top campaigns</h2>
@@ -803,6 +850,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       section(L, ['Campaign', 'Views'], data.campaigns, function (r) { return [r.campaign, r.views] })
       section(L, ['UTM source', 'Views'], data.utmSources, function (r) { return [r.source, r.views] })
       section(L, ['UTM medium', 'Views'], data.utmMediums, function (r) { return [r.medium, r.views] })
+      section(L, ['Goal', 'Conversions', 'Rate %', 'Value'], data.goals, function (r) { return [r.name, r.conversions, r.rate, r.value] })
       var csv = '﻿' + L.join('\r\n')
       var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
       var url = URL.createObjectURL(blob)

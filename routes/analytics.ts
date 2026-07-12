@@ -7,6 +7,7 @@
  * through bun-query-builder's `db`.
  */
 
+import { createHash } from 'node:crypto'
 import { db } from '@stacksjs/database'
 import { response, route } from '@stacksjs/router'
 import {
@@ -48,6 +49,51 @@ function utmParam(v: unknown): string | null {
     return null
   const t = v.trim()
   return t ? t.slice(0, 255) : null
+}
+
+/**
+ * Goal-matching contract. A goal targets either a `pageview` (matched against
+ * the page path) or an `event` (matched against the custom event name), using
+ * one of three `match_type`s. Returns whether the current hit fires this goal.
+ * NOTE: duration_minutes-based goals are out of scope this round (future work).
+ */
+interface GoalRow {
+  id: string
+  type: string | null
+  pattern: string | null
+  match_type: string | null
+  value: number | null
+}
+
+function matchesGoal(
+  goal: GoalRow,
+  hit: { isPageview: boolean, path: string, eventName: string },
+): boolean {
+  const wantPageview = goal.type === 'pageview'
+  // A pageview goal never matches an event hit, and vice-versa.
+  if (wantPageview !== hit.isPageview)
+    return false
+  const subject = wantPageview ? hit.path : hit.eventName
+  const pattern = goal.pattern ?? ''
+  switch (goal.match_type) {
+    case 'contains':
+      return subject.includes(pattern)
+    case 'starts_with':
+      return subject.startsWith(pattern)
+    case 'exact':
+    default:
+      return subject === pattern
+  }
+}
+
+/**
+ * Deterministic conversion id = sha256(session_id|goal_id), truncated. Combined
+ * with insertOrIgnore (which emits `INSERT IGNORE` on the mysql/SingleStore
+ * dialect), this enforces exactly one conversion per session per goal: a repeat
+ * beacon in the same session recomputes the same id and the insert is a no-op.
+ */
+function conversionId(sessionId: string, goalId: string): string {
+  return createHash('sha256').update(`${sessionId}|${goalId}`).digest('hex').slice(0, 32)
 }
 
 // ---------------------------------------------------------------------------
@@ -153,6 +199,41 @@ route.post('/collect', async (request: any) => {
     }).execute()
   }
 
+  // Goal / conversion matching. Runs AFTER the session insert above so the
+  // conversions.session_id FK is satisfied. Wrapped in try/catch (and each
+  // insert is insertOrIgnore + .catch) so a goals failure can never break the
+  // pageview 204. Hot-path cost: one indexed SELECT per beacon (+ up to N tiny
+  // insertOrIgnores); goals-per-site is small, so this is fine for now — cache
+  // per-site active goals with a short TTL later if it ever matters.
+  try {
+    const isPageview = event === 'pageview'
+    const eventName = String(event)
+    const goals = await db.unsafe(
+      `SELECT id, type, pattern, match_type, value FROM goals WHERE site_id = ? AND is_active = 1 LIMIT 100`,
+      [String(siteId)],
+    )
+    for (const goal of (goals ?? []) as GoalRow[]) {
+      if (!matchesGoal(goal, { isPageview, path, eventName }))
+        continue
+      // Deterministic id + INSERT IGNORE => once per session per goal. Stores the
+      // goal's value and this beacon's attribution + timestamp.
+      await db.insertOrIgnore('conversions', {
+        id: conversionId(sessionId, goal.id),
+        site_id: String(siteId),
+        goal_id: goal.id,
+        visitor_id: visitorId,
+        session_id: sessionId,
+        value: goal.value ?? null,
+        path,
+        referrer_source: source,
+        utm_source: utmParam(body.utm_source),
+        utm_campaign: utmParam(body.utm_campaign),
+        timestamp: now,
+      }).catch(() => {})
+    }
+  }
+  catch { /* goals/conversions are best-effort; never block the beacon */ }
+
   return new Response(null, { status: 204, headers: CORS })
 })
   // Public cross-origin, cookieless tracking beacon — no CSRF cookie can ride
@@ -167,6 +248,73 @@ route.post('/collect', async (request: any) => {
 // GROUP BY aggregates, and skips the global soft-delete filter these tables
 // don't participate in. Timestamps are stored as ISO strings, whose
 // lexicographic order matches chronological order, so string range works.
+// ---------------------------------------------------------------------------
+// Goals (management API)
+// ---------------------------------------------------------------------------
+
+const GOAL_TYPES = new Set(['pageview', 'event'])
+const GOAL_MATCH_TYPES = new Set(['exact', 'contains', 'starts_with'])
+
+route.options('/api/sites/{siteId}/goals', () => new Response(null, { status: 204, headers: CORS }))
+
+route.get('/api/sites/{siteId}/goals', async (request: any) => {
+  const siteId = request.params.siteId
+  const rows = await db.unsafe(
+    `SELECT id, site_id, name, type, pattern, match_type, value, is_active
+    FROM goals WHERE site_id = ? ORDER BY created_at DESC`,
+    [siteId],
+  )
+  return json({ goals: rows ?? [] })
+}).middleware('auth')
+
+route.post('/api/sites/{siteId}/goals', async (request: any) => {
+  const siteId = request.params.siteId
+  const body = request.jsonBody ?? {}
+  const name = typeof body.name === 'string' ? body.name.trim().slice(0, 255) : ''
+  const type = String(body.type ?? '')
+  const pattern = typeof body.pattern === 'string' ? body.pattern.trim().slice(0, 255) : ''
+  const matchType = String(body.match_type ?? 'exact')
+  const value = body.value == null || body.value === '' ? null : Number(body.value)
+
+  if (!name)
+    return json({ error: 'name is required' }, 400)
+  if (!GOAL_TYPES.has(type))
+    return json({ error: 'type must be pageview or event' }, 400)
+  if (!GOAL_MATCH_TYPES.has(matchType))
+    return json({ error: 'match_type must be exact, contains, or starts_with' }, 400)
+  if (!pattern)
+    return json({ error: 'pattern is required' }, 400)
+  if (value != null && !Number.isFinite(value))
+    return json({ error: 'value must be a finite number' }, 400)
+
+  // Cap active goals per site to bound the /collect matching loop (defense-in-depth).
+  const activeCount = (await db.unsafe(`SELECT COUNT(*) AS n FROM goals WHERE site_id = ? AND is_active = 1`, [String(siteId)]))?.[0]?.n
+  if (Number(activeCount ?? 0) >= 50)
+    return json({ error: 'active goal limit reached (50)' }, 409)
+
+  const now = new Date().toISOString()
+  // Self-register the site (goals.site_id FKs to sites.id) before the child insert.
+  await db.insertOrIgnore('sites', { id: String(siteId), created_at: now }).catch(() => {})
+
+  const id = randomId()
+  await db.insertInto('goals').values({
+    id,
+    site_id: String(siteId),
+    name,
+    type,
+    pattern,
+    match_type: matchType,
+    value,
+    is_active: true,
+  }).execute()
+
+  return json({ goal: { id, site_id: String(siteId), name, type, pattern, match_type: matchType, value, is_active: true } }, 201)
+})
+  // Management endpoint: require an authenticated user (bearer token — CSRF-immune).
+  // Full per-site ownership check against sites.owner_id is a follow-up.
+  .middleware('auth')
+  .skipCsrf()
+
 route.get('/api/sites/{siteId}/stats', async (request: any) => {
   const siteId = request.params.siteId
   const { from, to } = window(request)
