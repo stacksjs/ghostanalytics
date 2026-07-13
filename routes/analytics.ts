@@ -125,7 +125,26 @@ route.post('/collect', async (request: any) => {
 
   const ip = clientIp(request.headers)
   const visitorId = hashVisitor(ip, ua, String(siteId))
-  const sessionId = body.sid ? String(body.sid) : visitorId
+  // Server-side sessionization (no client storage → cookieless/consent-free, the point of a
+  // privacy-first tracker): a session is one anonymous visitor's activity within a rolling
+  // 30-minute inactivity window. Primary path: reuse the session id from this visitor's most
+  // recent hit in the window (page_views(visitor_id) index). On a miss (or lookup failure) the
+  // fallback id is DETERMINISTIC — sha256(site|visitor|30-min bucket) — NOT random, so two
+  // concurrent first-hit beacons from one visitor (e.g. the load pageview + a pushState pv, or
+  // a beacon during a DB blip) compute the SAME id and the sessions insertOrIgnore dedups them
+  // into one session instead of racing into two. Accepted cookieless trade-offs (as in
+  // Fathom/Plausible): a visitor whose IP changes mid-visit, or a visit crossing the daily
+  // visitor-salt rotation at UTC midnight, starts a new session. TODO(scale): this per-beacon
+  // lookup is a non-shard-key fan-out on SingleStore — cache the active session when traffic warrants.
+  const SESSION_WINDOW_MS = 30 * 60 * 1000
+  const sessionSince = new Date(Date.now() - SESSION_WINDOW_MS).toISOString()
+  const recentSession = (await db.unsafe(
+    `SELECT session_id FROM page_views WHERE site_id = ? AND visitor_id = ? AND timestamp >= ? ORDER BY timestamp DESC LIMIT 1`,
+    [String(siteId), visitorId, sessionSince],
+  ).catch(() => [])) as Array<{ session_id: string }>
+  const sessionId = recentSession[0]?.session_id
+    ? String(recentSession[0].session_id)
+    : createHash('sha256').update(`${siteId}|${visitorId}|${Math.floor(Date.now() / SESSION_WINDOW_MS)}`).digest('hex').slice(0, 32)
   const info = parseUserAgent(ua)
   const country = geoCountry(request.headers)
   const now = new Date().toISOString()
@@ -407,10 +426,11 @@ route.get('/script.js', (request: any) => {
   const script = `(function(){
   var d=document,w=window,s=d.currentScript,site=s&&s.getAttribute('data-site');
   if(!site)return;
-  var sid=(w.crypto&&w.crypto.randomUUID?w.crypto.randomUUID():Math.random().toString(36).slice(2));
+  // No cookies or device storage: the server derives sessions from the anonymous visitor
+  // hash + a 30-min window, keeping the tracker consent-free.
   function send(e,p){try{
     var q=new URLSearchParams(location.search),
-      b={s:site,sid:sid,e:e,p:p||{},u:location.origin+location.pathname,r:d.referrer||'',t:d.title,sw:screen.width,sh:screen.height};
+      b={s:site,e:e,p:p||{},u:location.origin+location.pathname,r:d.referrer||'',t:d.title,sw:screen.width,sh:screen.height};
     ['source','medium','campaign','content','term'].forEach(function(k){var v=q.get('utm_'+k);if(v)b['utm_'+k]=v});
     fetch('${origin}/collect',{method:'POST',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
   }catch(_){}}
