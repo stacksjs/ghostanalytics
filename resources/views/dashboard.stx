@@ -11,13 +11,20 @@ const meta = { title: 'ghostanalytics - Dashboard', description: 'Privacy-first 
 const query = new URLSearchParams((typeof globalThis !== 'undefined' && globalThis.__stxServeSearch) || '')
 let siteId = query.get('site') || 'demo'
 const range = query.get('range') || '1y'
-const days = range === '30d' ? 30 : range === '90d' ? 90 : range === '1y' ? 365 : 7
+const days = range === '24h' ? 1 : range === '30d' ? 30 : range === '90d' ? 90 : range === '1y' ? 365 : 7
 const from = new Date(Date.now() - days * 864e5).toISOString()
 const to = new Date().toISOString()
+// Chart bucket width: hourly for short spans (<= 2 days) so a 24h view shows a real
+// curve instead of one dot, else daily. bucketLen = the LEFT(timestamp, N) prefix
+// length — 'YYYY-MM-DDTHH' (13) vs 'YYYY-MM-DD' (10). String-prefix bucketing (no
+// date math) stays MySQL/SingleStore-safe, same as the daily chart.
+const hourly = days <= 2
+const bucketLen = hourly ? 13 : 10
 // Last ~5 minutes; ISO string compares lexicographically against the ISO timestamp column.
 const liveFrom = new Date(Date.now() - 5 * 60 * 1000).toISOString()
 
 const ranges = [
+  { key: '24h', label: '24 hours' },
   { key: '7d', label: '7 days' },
   { key: '30d', label: '30 days' },
   { key: '90d', label: '90 days' },
@@ -150,7 +157,7 @@ async function loadData() {
     `SELECT COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors, COUNT(DISTINCT session_id) AS sessions FROM page_views WHERE ${filter}`, p))?.[0]
   kpis = { views: Number(row?.views ?? 0), visitors: Number(row?.visitors ?? 0), sessions: Number(row?.sessions ?? 0) }
   series = (await db.unsafe(
-    `SELECT LEFT(timestamp, 10) AS day, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors FROM page_views WHERE ${filter} GROUP BY LEFT(timestamp, 10) ORDER BY day ASC`, p)) ?? []
+    `SELECT LEFT(timestamp, ${bucketLen}) AS day, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors FROM page_views WHERE ${filter} GROUP BY LEFT(timestamp, ${bucketLen}) ORDER BY day ASC`, p)) ?? []
   pages = (await db.unsafe(
     `SELECT path, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors FROM page_views WHERE ${filter} GROUP BY path ORDER BY views DESC LIMIT 8`, p)) ?? []
   // Entry / exit pages: the FIRST and LAST page_view of each session (the tracker
@@ -366,6 +373,7 @@ function buildChart(rows) {
     const visitors = Number(r.visitors || 0)
     return {
       day: r.day,
+      label: r.label,
       views,
       visitors,
       x: xFor(i),
@@ -379,20 +387,27 @@ function buildChart(rows) {
   const area = pts.length
     ? `M${pts[0].x.toFixed(1)} ${bottom} L${pts.map(pt => `${pt.x.toFixed(1)} ${pt.vy.toFixed(1)}`).join(' L')} L${pts[pts.length - 1].x.toFixed(1)} ${bottom} Z`
     : ''
-  return { pts, viewsLine: line('vy'), visitorsLine: line('uy'), area, bottom, firstDay: pts[0]?.day, lastDay: pts[pts.length - 1]?.day, ...CHART }
+  return { pts, viewsLine: line('vy'), visitorsLine: line('uy'), area, bottom, firstDay: pts[0]?.day, lastDay: pts[pts.length - 1]?.day, firstLabel: pts[0]?.label, lastLabel: pts[pts.length - 1]?.label, ...CHART }
 }
-// Fill every calendar day in the range so the x-axis is time-proportional: days
-// with no traffic become 0 (a 6-month gap no longer looks like a 1-day gap), and
-// a single active day still draws a full-width baseline instead of an invisible point.
+// Fill every bucket in the range so the x-axis is time-proportional: buckets with
+// no traffic become 0 (a 6-month gap no longer looks like a 1-day gap), and a
+// single active bucket still draws a full-width baseline instead of an invisible
+// point. Step is hourly or daily to match the query's LEFT(timestamp, N) bucket;
+// `day` holds the raw bucket key (matches the query alias + Map lookup + CSV),
+// `label` is the display form ('MM-DD HH:00' hourly, 'YYYY-MM-DD' daily).
 function densify(rows, fromISO, toISO) {
-  const byDay = new Map(rows.map(r => [r.day, r]))
+  const byKey = new Map(rows.map(r => [r.day, r]))
   const out = []
-  let d = new Date(`${fromISO.slice(0, 10)}T00:00:00Z`)
-  const end = new Date(`${toISO.slice(0, 10)}T00:00:00Z`)
-  for (; d <= end; d = new Date(d.getTime() + 864e5)) {
-    const day = d.toISOString().slice(0, 10)
-    const r = byDay.get(day)
-    out.push({ day, views: r ? Number(r.views || 0) : 0, visitors: r ? Number(r.visitors || 0) : 0 })
+  const step = hourly ? 3600e3 : 864e5
+  const start = hourly ? `${fromISO.slice(0, 13)}:00:00Z` : `${fromISO.slice(0, 10)}T00:00:00Z`
+  const stopAt = hourly ? `${toISO.slice(0, 13)}:00:00Z` : `${toISO.slice(0, 10)}T00:00:00Z`
+  let d = new Date(start)
+  const end = new Date(stopAt)
+  for (; d <= end; d = new Date(d.getTime() + step)) {
+    const key = d.toISOString().slice(0, hourly ? 13 : 10)
+    const label = hourly ? `${key.slice(5, 10)} ${key.slice(11, 13)}:00` : key
+    const r = byKey.get(key)
+    out.push({ day: key, label, views: r ? Number(r.views || 0) : 0, visitors: r ? Number(r.visitors || 0) : 0 })
   }
   return out
 }
@@ -579,7 +594,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       </div>
       @if (series.length)
         <div class="relative h-44 w-full ga-chart">
-          <svg class="block h-full w-full" role="img" aria-label="Traffic over time from {{ chart.firstDay }} to {{ chart.lastDay }}: {{ kpis.views.toLocaleString() }} page views, {{ kpis.visitors.toLocaleString() }} unique visitors. Per-day figures are in the CSV export." viewBox="0 0 {{ chart.w }} {{ chart.h }}" preserveAspectRatio="none" style="overflow: visible">
+          <svg class="block h-full w-full" role="img" aria-label="Traffic over time from {{ chart.firstLabel }} to {{ chart.lastLabel }}: {{ kpis.views.toLocaleString() }} page views, {{ kpis.visitors.toLocaleString() }} unique visitors. Per-bucket figures are in the CSV export." viewBox="0 0 {{ chart.w }} {{ chart.h }}" preserveAspectRatio="none" style="overflow: visible">
             <defs>
               <linearGradient id="ga-fill" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.22"/>
@@ -597,7 +612,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
                 <span class="ga-dot ga-dot-v" style="top: {{ pt.viewsTopPct }}%"></span>
                 <span class="ga-dot ga-dot-u" style="top: {{ pt.visTopPct }}%"></span>
                 <div class="ga-tip" style="top: {{ pt.viewsTopPct }}%">
-                  <div class="ga-tip-day mono">{{ pt.day }}</div>
+                  <div class="ga-tip-day mono">{{ pt.label }}</div>
                   <div class="ga-tip-row"><span class="ga-sw" style="background: var(--accent)"></span>Views <b class="mono">{{ pt.views.toLocaleString() }}</b></div>
                   <div class="ga-tip-row"><span class="ga-sw" style="background: var(--text-3)"></span>Visitors <b class="mono">{{ pt.visitors.toLocaleString() }}</b></div>
                 </div>
@@ -606,8 +621,11 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
           </div>
         </div>
         <div class="flex justify-between mt-2 text-xs mono" style="color: var(--text-3)">
-          <span>{{ chart.firstDay }}</span>
-          <span>{{ chart.lastDay }}</span>
+          <span>{{ chart.firstLabel }}</span>
+          @if (hourly)
+            <span style="opacity: 0.7">UTC</span>
+          @endif
+          <span>{{ chart.lastLabel }}</span>
         </div>
       @else
         <div class="flex items-center justify-center h-44 text-sm" style="color: var(--text-3)">No page views in this range yet.</div>
