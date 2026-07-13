@@ -72,6 +72,15 @@ const CHANNEL_NAMES = ['Search', 'Social', 'Direct', 'Referral']
 const activeFilters = []
 let filterSql = ''
 const filterParams = []
+// Session-constant dimensions (country/device/browser/os are identical on every
+// page_view of a session). ONLY these are safe to apply inside the entry/exit-page
+// window subqueries: the per-pageview-varying keys (path/source/channel/campaign/
+// utm*) would strip mid-session rows before ROW_NUMBER/COUNT(*) OVER run and corrupt
+// first/last-page identity + the session-length bounce count. The window queries use
+// sessionFilterSql (this subset) instead of the full filterSql.
+const SESSION_DIMENSIONS = new Set(['country', 'device', 'browser', 'os'])
+let sessionFilterSql = ''
+const sessionFilterParams = []
 for (const key of Object.keys(FILTERS)) {
   const raw = query.get(key)
   if (raw == null)
@@ -92,6 +101,10 @@ for (const key of Object.keys(FILTERS)) {
   else {
     filterSql += ` AND ${def.col} = ?`
     filterParams.push(value)
+    if (SESSION_DIMENSIONS.has(key)) {
+      sessionFilterSql += ` AND ${def.col} = ?`
+      sessionFilterParams.push(value)
+    }
     activeFilters.push({ key, label: def.label, value })
   }
 }
@@ -152,6 +165,12 @@ async function loadData() {
   }
   const p = [siteId, from, to, ...filterParams]
   const filter = `site_id = ? AND timestamp >= ? AND timestamp <= ?${filterSql}`
+  // Entry/exit-page windows must see each session's FULL pageview history, so they use
+  // sessionFilter (site + time + session-constant dims only). Applying the per-pageview
+  // filters here — e.g. ?path=/x, one click from the Top pages panel — would remove
+  // mid-session rows before the windows run and fabricate entry/exit identity + bounce.
+  const sessionP = [siteId, from, to, ...sessionFilterParams]
+  const sessionFilter = `site_id = ? AND timestamp >= ? AND timestamp <= ?${sessionFilterSql}`
 
   const row = (await db.unsafe(
     `SELECT COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors, COUNT(DISTINCT session_id) AS sessions FROM page_views WHERE ${filter}`, p))?.[0]
@@ -164,16 +183,27 @@ async function loadData() {
   // never updates sessions.exit_path, so derive from page_views like bounce rate).
   // ROW_NUMBER windows per session by time (id as a deterministic tiebreaker);
   // filter-aware via the shared filter/p. Portable across MySQL 8+ and SingleStore.
+  // Entry pages also carry a per-page bounce rate: a second window (COUNT(*) OVER
+  // the session) gives each session's total page views in the same pass, so the
+  // entry row (rn = 1) knows if its session bounced (pv = 1). SUM(pv = 1) per entry
+  // page, over top-8, sums to the same bounced/sessions as the overall bounce KPI.
   entryPages = (await db.unsafe(
-    `SELECT path, COUNT(*) AS entries, COUNT(DISTINCT visitor_id) AS visitors FROM (
-       SELECT path, visitor_id, ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY timestamp ASC, id ASC) AS rn
-       FROM page_views WHERE ${filter}
-     ) t WHERE t.rn = 1 GROUP BY path ORDER BY entries DESC LIMIT 8`, p)) ?? []
+    `SELECT path, COUNT(*) AS entries, COUNT(DISTINCT visitor_id) AS visitors, SUM(pv = 1) AS bounces FROM (
+       SELECT path, visitor_id,
+              ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY timestamp ASC, id ASC) AS rn,
+              COUNT(*)    OVER (PARTITION BY session_id) AS pv
+       FROM page_views WHERE ${sessionFilter}
+     ) t WHERE t.rn = 1 GROUP BY path ORDER BY entries DESC LIMIT 8`, sessionP)) ?? []
+  // NOTE: the pv window is COUNT(*) OVER (PARTITION BY session_id) with NO ORDER BY on
+  // purpose — the whole-partition frame yields the session's TOTAL page views on every
+  // row (so the rn=1 entry row knows if pv=1 => bounced). Adding an ORDER BY here would
+  // switch it to a running count (entry row always sees pv=1) and silently report ~100%
+  // bounce on every entry page. Do not add one.
   exitPages = (await db.unsafe(
     `SELECT path, COUNT(*) AS exits, COUNT(DISTINCT visitor_id) AS visitors FROM (
        SELECT path, visitor_id, ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY timestamp DESC, id DESC) AS rn
-       FROM page_views WHERE ${filter}
-     ) t WHERE t.rn = 1 GROUP BY path ORDER BY exits DESC LIMIT 8`, p)) ?? []
+       FROM page_views WHERE ${sessionFilter}
+     ) t WHERE t.rn = 1 GROUP BY path ORDER BY exits DESC LIMIT 8`, sessionP)) ?? []
   referrers = (await db.unsafe(
     `SELECT referrer_source AS source, COUNT(*) AS views FROM page_views WHERE ${filter} GROUP BY referrer_source ORDER BY views DESC LIMIT 8`, p)) ?? []
   // All sources (no LIMIT) so each can be folded into a channel below.
@@ -440,7 +470,7 @@ const exportPayload = {
   utmMediums: utmMediums.map(m => ({ medium: m.medium, views: Number(m.views || 0) })),
   goals: goals.map(g => ({ name: g.name, conversions: Number(g.conversions || 0), converters: Number(g.converters || 0), rate: Number(goalRate(g.converters).toFixed(2)), value: Number(g.total_value || 0) })),
   events: events.map(e => ({ name: e.name, events: Number(e.events || 0), visitors: Number(e.visitors || 0) })),
-  entryPages: entryPages.map(e => ({ path: e.path, entries: Number(e.entries || 0), visitors: Number(e.visitors || 0) })),
+  entryPages: entryPages.map(e => ({ path: e.path, entries: Number(e.entries || 0), visitors: Number(e.visitors || 0), bounces: Number(e.bounces || 0), bounce: Number(e.entries) ? Math.round((Number(e.bounces || 0) / Number(e.entries)) * 100) : 0 })),
   exitPages: exitPages.map(e => ({ path: e.path, exits: Number(e.exits || 0), visitors: Number(e.visitors || 0) })),
 }
 const exportJson = JSON.stringify(exportPayload)
@@ -675,8 +705,9 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
             <div class="absolute inset-y-1 left-0 rounded" style="width: {{ Math.round((Number(e.entries) / maxEntry) * 100) }}%; background: var(--bar);"></div>
             <span class="relative pr-2 truncate ga-row-label mono" style="color: var(--text-2)">{{ e.path }}</span>
             <span class="flex relative gap-3.5 items-baseline">
-              <span class="tabular-nums mono" style="color: var(--text-3)">{{ Number(e.visitors).toLocaleString() }}</span>
-              <span class="font-medium tabular-nums mono">{{ Number(e.entries).toLocaleString() }}</span>
+              <span class="tabular-nums mono" style="color: var(--text-3)" title="Bounce rate">{{ Math.round((Number(e.bounces) / Number(e.entries)) * 100) }}%</span>
+              <span class="tabular-nums mono" style="color: var(--text-3)" title="Unique visitors">{{ Number(e.visitors).toLocaleString() }}</span>
+              <span class="font-medium tabular-nums mono" title="Entries">{{ Number(e.entries).toLocaleString() }}</span>
             </span>
           </div>
         @empty
@@ -967,7 +998,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       section(L, ['UTM medium', 'Views'], data.utmMediums, function (r) { return [r.medium, r.views] })
       section(L, ['Goal', 'Conversions', 'Rate %', 'Value'], data.goals, function (r) { return [r.name, r.conversions, r.rate, r.value] })
       section(L, ['Event', 'Events', 'Visitors'], data.events, function (r) { return [r.name, r.events, r.visitors] })
-      section(L, ['Entry page', 'Entries', 'Visitors'], data.entryPages, function (r) { return [r.path, r.entries, r.visitors] })
+      section(L, ['Entry page', 'Entries', 'Visitors', 'Bounce %'], data.entryPages, function (r) { return [r.path, r.entries, r.visitors, r.bounce] })
       section(L, ['Exit page', 'Exits', 'Visitors'], data.exitPages, function (r) { return [r.path, r.exits, r.visitors] })
       var csv = '﻿' + L.join('\r\n')
       var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
