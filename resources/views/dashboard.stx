@@ -438,12 +438,19 @@ function pct(cur, prev) {
 }
 const curVpv = kpis.visitors ? kpis.views / kpis.visitors : 0
 const prevVpv = prevVisitors ? prevViews / prevVisitors : 0
+// Views per visit = page views / sessions ("pages per session"). Distinct from
+// Views / visitor above (per unique visitor). This metric is only meaningful now
+// that sessions span multiple page views (server-side sessionization) — before,
+// every page view was its own session, so it was pinned at ~1.0.
+const curVps = kpis.sessions ? kpis.views / kpis.sessions : 0
+const prevVps = prevSessions ? prevViews / prevSessions : 0
 
 const kpiCards = [
   { label: 'Unique visitors', value: kpis.visitors.toLocaleString(), delta: pct(kpis.visitors, prevVisitors), goodUp: true },
   { label: 'Page views', value: kpis.views.toLocaleString(), delta: pct(kpis.views, prevViews), goodUp: true },
   { label: 'Sessions', value: kpis.sessions.toLocaleString(), delta: pct(kpis.sessions, prevSessions), goodUp: true },
   { label: 'Bounce rate', value: `${bounceRate}%`, delta: pct(bounceRate, prevBounce), goodUp: false },
+  { label: 'Views / visit', value: kpis.sessions ? curVps.toFixed(1) : '0.0', delta: pct(curVps, prevVps), goodUp: true },
   { label: 'Views / visitor', value: kpis.visitors ? curVpv.toFixed(1) : '0.0', delta: pct(curVpv, prevVpv), goodUp: true },
 ]
 
@@ -535,6 +542,7 @@ const exportPayload = {
     views: kpis.views,
     sessions: kpis.sessions,
     bounceRate,
+    viewsPerVisit: kpis.sessions ? Number(curVps.toFixed(2)) : 0,
     viewsPerVisitor: kpis.visitors ? Number(curVpv.toFixed(2)) : 0,
   },
   series: series.map(s => ({ day: s.day, views: Number(s.views || 0), visitors: Number(s.visitors || 0) })),
@@ -686,7 +694,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
     @endif
 
     <!-- KPIs: hairline-separated, mono numerics, no heavy card chrome -->
-    <div class="grid grid-cols-2 lg:grid-cols-5 mb-6 lg:divide-x panel reveal" style="border-color: var(--border)">
+    <div class="grid grid-cols-2 lg:grid-cols-6 mb-6 lg:divide-x panel reveal" style="border-color: var(--border)">
       @foreach (kpiCards as kpi)
         <div class="px-5 py-5" style="border-color: var(--border)">
           <div class="mb-2 font-medium text-xs tracking-wider uppercase" style="color: var(--text-3)">{{ kpi.label }}</div>
@@ -1135,6 +1143,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       L.push(row(['Page views', data.kpis.views]))
       L.push(row(['Sessions', data.kpis.sessions]))
       L.push(row(['Bounce rate %', data.kpis.bounceRate]))
+      L.push(row(['Views per visit', data.kpis.viewsPerVisit]))
       L.push(row(['Views per visitor', data.kpis.viewsPerVisitor]))
       L.push('')
       section(L, ['Date', 'Views', 'Visitors'], data.series, function (r) { return [r.day, r.views, r.visitors] })
