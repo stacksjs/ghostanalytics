@@ -680,7 +680,12 @@ export const tsCloud: TsCloudConfig = {
     // :3000, fronted by the reverse proxy on ghostanalytics.org. This is the
     // ONLY site: no docs/blog/marketing static sites (this is a single-purpose
     // analytics app, not the stacks.com monorepo the scaffold was cloned from).
-    main: {
+    //
+    // Keyed `ghostanalytics` (not the generic `main`) so that on the shared
+    // `stacks` box (attachTo) this ships to /var/www/ghostanalytics and a
+    // `ghostanalytics-ghostanalytics` service — never colliding with the box
+    // owner's own `main` site at /var/www/main.
+    ghostanalytics: {
       root: '.',
       path: '/',
       domain: env.APP_DOMAIN || 'ghostanalytics.org',
