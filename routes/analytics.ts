@@ -187,16 +187,36 @@ route.post('/collect', async (request: any) => {
     }).execute()
   }
   else {
+    // Reserved auto-tracked events (Outbound Link / File Download) carry only a url. Store
+    // it canonically as {"url":...} regardless of any extra keys / key-order a caller sends,
+    // so the dashboard's GROUP BY properties aggregates exactly one row per URL — a client
+    // can't split or pollute a URL's row by appending junk keys.
+    let props = body.p ? JSON.stringify(body.p) : null
+    if ((String(event) === 'Outbound Link' || String(event) === 'File Download') && body.p && body.p.url) {
+      let url = String(body.p.url)
+      props = JSON.stringify({ url })
+      // properties is varchar(255): trim the url until the wrapped JSON fits, so it stays
+      // valid JSON (the dashboard JSON.parses it) and never overflows the column — an
+      // overflow would 500 on strict MySQL or, on SingleStore, silently truncate and then
+      // collate distinct urls that share a 255-char prefix into one row. Only pathologically
+      // long hrefs hit the loop. (TODO: widen custom_events.properties for full-length urls.)
+      while (props.length > 255 && url.length) {
+        url = url.slice(0, -8)
+        props = JSON.stringify({ url })
+      }
+    }
+    // .catch like the sites/sessions inserts above: a storage failure (e.g. an over-length
+    // non-reserved props blob under strict sql_mode) must never 500 the public beacon.
     await db.insertInto('custom_events').values({
       id: randomId(),
       site_id: String(siteId),
       session_id: sessionId,
       visitor_id: visitorId,
       name: String(event),
-      properties: body.p ? JSON.stringify(body.p) : null,
+      properties: props,
       path,
       timestamp: now,
-    }).execute()
+    }).execute().catch(() => {})
   }
 
   // Goal / conversion matching. Runs AFTER the session insert above so the

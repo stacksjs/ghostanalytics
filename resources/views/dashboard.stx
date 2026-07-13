@@ -137,6 +137,20 @@ function compareToggleUrl() {
 }
 // --------------------------------------------------------------------------
 
+// Outbound Link / File Download events store {"url":"..."} in properties (the tracker
+// sends only that key), so GROUP BY properties == GROUP BY url — SingleStore-safe (a plain
+// varchar group, no JSON_EXTRACT). eventUrl unwraps it for display; falls back to the raw
+// string if it isn't the expected shape.
+function eventUrl(props) {
+  try {
+    const o = JSON.parse(props)
+    return o && o.url ? String(o.url) : String(props)
+  }
+  catch {
+    return String(props)
+  }
+}
+
 let kpis = { views: 0, visitors: 0, sessions: 0 }
 let series = []
 let prevSeries = []
@@ -158,6 +172,8 @@ let prevBounce = 0
 let liveNow = 0
 let goals = []
 let events = []
+let outboundLinks = []
+let fileDownloads = []
 let entryPages = []
 let exitPages = []
 let live = false
@@ -289,6 +305,22 @@ async function loadData() {
     FROM custom_events
     WHERE site_id = ? AND timestamp >= ? AND timestamp <= ?
     GROUP BY name ORDER BY events DESC LIMIT 8`, [siteId, from, to])) ?? []
+  // Top outbound links / file downloads: the URLs behind the auto-tracked Outbound Link
+  // and File Download events. GROUP BY the whole properties varchar (== GROUP BY url, since
+  // the tracker sends only {url}) so it stays SingleStore-safe (no JSON_EXTRACT); eventUrl
+  // unwraps the JSON for display. Site+range scoped like Events (custom_events has no filter cols).
+  const outRows = (await db.unsafe(
+    `SELECT properties, COUNT(*) AS clicks, COUNT(DISTINCT visitor_id) AS visitors
+    FROM custom_events
+    WHERE site_id = ? AND name = ? AND timestamp >= ? AND timestamp <= ? AND properties IS NOT NULL
+    GROUP BY properties ORDER BY clicks DESC LIMIT 8`, [siteId, 'Outbound Link', from, to])) ?? []
+  outboundLinks = outRows.map(r => ({ url: eventUrl(r.properties), clicks: Number(r.clicks || 0), visitors: Number(r.visitors || 0) }))
+  const dlRows = (await db.unsafe(
+    `SELECT properties, COUNT(*) AS clicks, COUNT(DISTINCT visitor_id) AS visitors
+    FROM custom_events
+    WHERE site_id = ? AND name = ? AND timestamp >= ? AND timestamp <= ? AND properties IS NOT NULL
+    GROUP BY properties ORDER BY clicks DESC LIMIT 8`, [siteId, 'File Download', from, to])) ?? []
+  fileDownloads = dlRows.map(r => ({ url: eventUrl(r.properties), clicks: Number(r.clicks || 0), visitors: Number(r.visitors || 0) }))
   live = true
 }
 
@@ -318,6 +350,8 @@ try {
     liveNow = preloaded.liveNow ?? 0
     goals = preloaded.goals ?? []
     events = preloaded.events ?? []
+    outboundLinks = preloaded.outboundLinks ?? []
+    fileDownloads = preloaded.fileDownloads ?? []
     entryPages = preloaded.entryPages ?? []
     exitPages = preloaded.exitPages ?? []
     live = true
@@ -350,6 +384,8 @@ const maxUtmMedium = utmMediums.reduce((m, u) => Math.max(m, Number(u.views || 0
 const maxGoal = goals.reduce((m, g) => Math.max(m, Number(g.conversions || 0)), 0) || 1
 // Events: bar is scaled to the busiest event's count (site+range scoped, like goals).
 const maxEvent = events.reduce((m, e) => Math.max(m, Number(e.events || 0)), 0) || 1
+const maxOutbound = outboundLinks.reduce((m, l) => Math.max(m, Number(l.clicks || 0)), 0) || 1
+const maxDownload = fileDownloads.reduce((m, l) => Math.max(m, Number(l.clicks || 0)), 0) || 1
 function goalRate(converters) {
   if (!kpis.visitors)
     return 0
@@ -505,6 +541,8 @@ const exportPayload = {
   utmMediums: utmMediums.map(m => ({ medium: m.medium, views: Number(m.views || 0) })),
   goals: goals.map(g => ({ name: g.name, conversions: Number(g.conversions || 0), converters: Number(g.converters || 0), rate: Number(goalRate(g.converters).toFixed(2)), value: Number(g.total_value || 0) })),
   events: events.map(e => ({ name: e.name, events: Number(e.events || 0), visitors: Number(e.visitors || 0) })),
+  outboundLinks: outboundLinks.map(l => ({ url: l.url, clicks: Number(l.clicks || 0), visitors: Number(l.visitors || 0) })),
+  fileDownloads: fileDownloads.map(l => ({ url: l.url, clicks: Number(l.clicks || 0), visitors: Number(l.visitors || 0) })),
   entryPages: entryPages.map(e => ({ path: e.path, entries: Number(e.entries || 0), visitors: Number(e.visitors || 0), bounces: Number(e.bounces || 0), bounce: Number(e.entries) ? Math.round((Number(e.bounces || 0) / Number(e.entries)) * 100) : 0 })),
   exitPages: exitPages.map(e => ({ path: e.path, exits: Number(e.exits || 0), visitors: Number(e.visitors || 0) })),
 }
@@ -898,6 +936,43 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       @endforelse
     </div>
 
+    <!-- Top outbound links / file downloads: the URLs behind the auto-tracked Outbound
+        Link / File Download events (properties.url). GROUP BY properties (SingleStore-safe,
+        no JSON_EXTRACT); site+range scoped like Events. Display-only; {{ }} escapes the url. -->
+    <div class="grid gap-6 md:grid-cols-2 mt-6">
+      <div class="p-5 panel reveal">
+        <h2 class="mb-4 font-semibold text-xs tracking-wider uppercase" style="color: var(--text-3)">Outbound links</h2>
+        @forelse (outboundLinks as l)
+          <div class="flex relative items-center justify-between -mx-1 px-1 py-2.5 text-sm">
+            <div class="absolute inset-y-1 left-0 rounded" style="width: {{ Math.round((Number(l.clicks) / maxOutbound) * 100) }}%; background: var(--bar);"></div>
+            <span class="relative pr-2 truncate ga-row-label mono" style="color: var(--text-2)">{{ l.url }}</span>
+            <span class="flex relative gap-3.5 items-baseline">
+              <span class="tabular-nums mono" style="color: var(--text-3)" title="Unique visitors">{{ Number(l.visitors).toLocaleString() }}</span>
+              <span class="font-medium tabular-nums mono" title="Clicks">{{ Number(l.clicks).toLocaleString() }}</span>
+            </span>
+          </div>
+        @empty
+          <div class="py-8 text-center text-sm" style="color: var(--text-3)">No outbound clicks yet.</div>
+        @endforelse
+      </div>
+
+      <div class="p-5 panel reveal">
+        <h2 class="mb-4 font-semibold text-xs tracking-wider uppercase" style="color: var(--text-3)">File downloads</h2>
+        @forelse (fileDownloads as l)
+          <div class="flex relative items-center justify-between -mx-1 px-1 py-2.5 text-sm">
+            <div class="absolute inset-y-1 left-0 rounded" style="width: {{ Math.round((Number(l.clicks) / maxDownload) * 100) }}%; background: var(--bar);"></div>
+            <span class="relative pr-2 truncate ga-row-label mono" style="color: var(--text-2)">{{ l.url }}</span>
+            <span class="flex relative gap-3.5 items-baseline">
+              <span class="tabular-nums mono" style="color: var(--text-3)" title="Unique visitors">{{ Number(l.visitors).toLocaleString() }}</span>
+              <span class="font-medium tabular-nums mono" title="Downloads">{{ Number(l.clicks).toLocaleString() }}</span>
+            </span>
+          </div>
+        @empty
+          <div class="py-8 text-center text-sm" style="color: var(--text-3)">No downloads yet.</div>
+        @endforelse
+      </div>
+    </div>
+
     <!-- Campaigns (UTM): full-width Top campaigns + a 2-up grid of UTM sources / mediums -->
     <div class="mt-6 p-5 panel reveal">
       <h2 class="mb-4 font-semibold text-xs tracking-wider uppercase" style="color: var(--text-3)">Top campaigns</h2>
@@ -1047,6 +1122,8 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       section(L, ['UTM medium', 'Views'], data.utmMediums, function (r) { return [r.medium, r.views] })
       section(L, ['Goal', 'Conversions', 'Rate %', 'Value'], data.goals, function (r) { return [r.name, r.conversions, r.rate, r.value] })
       section(L, ['Event', 'Events', 'Visitors'], data.events, function (r) { return [r.name, r.events, r.visitors] })
+      section(L, ['Outbound link', 'Clicks', 'Visitors'], data.outboundLinks, function (r) { return [r.url, r.clicks, r.visitors] })
+      section(L, ['File download', 'Downloads', 'Visitors'], data.fileDownloads, function (r) { return [r.url, r.clicks, r.visitors] })
       section(L, ['Entry page', 'Entries', 'Visitors', 'Bounce %'], data.entryPages, function (r) { return [r.path, r.entries, r.visitors, r.bounce] })
       section(L, ['Exit page', 'Exits', 'Visitors'], data.exitPages, function (r) { return [r.path, r.exits, r.visitors] })
       var csv = '﻿' + L.join('\r\n')
