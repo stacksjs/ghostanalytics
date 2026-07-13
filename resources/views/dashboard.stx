@@ -22,6 +22,11 @@ const hourly = days <= 2
 const bucketLen = hourly ? 13 : 10
 // Last ~5 minutes; ISO string compares lexicographically against the ISO timestamp column.
 const liveFrom = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+// Compare-to-previous-period overlay: ?compare=1 draws the immediately-preceding window
+// (same length) as a faded line on the chart. prevFrom is that window's start, hoisted to
+// module scope so the chart (built below, outside loadData) can densify the prev series.
+const compare = query.get('compare') === '1'
+const prevFrom = new Date(new Date(from).getTime() - days * 864e5).toISOString()
 
 const ranges = [
   { key: '24h', label: '24 hours' },
@@ -115,6 +120,8 @@ function filterQuery(mutate) {
   q.set('range', range)
   for (const f of activeFilters)
     q.set(f.key, f.value)
+  if (compare)
+    q.set('compare', '1')
   mutate(q)
   return `?${q.toString()}`
 }
@@ -124,10 +131,15 @@ function addFilterUrl(key, value) {
 function removeFilterUrl(key) {
   return filterQuery(q => q.delete(key))
 }
+// Toggle the compare overlay while preserving site + range + active filters.
+function compareToggleUrl() {
+  return filterQuery(q => compare ? q.delete('compare') : q.set('compare', '1'))
+}
 // --------------------------------------------------------------------------
 
 let kpis = { views: 0, visitors: 0, sessions: 0 }
 let series = []
+let prevSeries = []
 let pages = []
 let referrers = []
 let countries = []
@@ -228,11 +240,17 @@ async function loadData() {
   const b = (await db.unsafe(
     `SELECT COUNT(*) AS sessions, SUM(pv = 1) AS bounced FROM (SELECT session_id, COUNT(*) AS pv FROM page_views WHERE ${filter} GROUP BY session_id) t`, p))?.[0]
   bounceRate = Number(b?.sessions) ? Math.round((Number(b.bounced) / Number(b.sessions)) * 100) : 0
-  // Previous period (same length, immediately before) for trend deltas.
-  const prevFrom = new Date(new Date(from).getTime() - days * 864e5).toISOString()
+  // Previous period (same length, immediately before) for trend deltas. prevFrom is
+  // module-scoped (hoisted so the chart can reuse it); pp/filterPrev bind it here.
   const pp = [siteId, prevFrom, from, ...filterParams]
   // Strict upper bound so the boundary instant `from` belongs to the current period only.
   const filterPrev = `site_id = ? AND timestamp >= ? AND timestamp < ?${filterSql}`
+  // Previous-period timeseries (only when the compare overlay is on): same bucket width
+  // as the current series, over [prevFrom, from). Honors the full filter (pageview count).
+  if (compare) {
+    prevSeries = (await db.unsafe(
+      `SELECT LEFT(timestamp, ${bucketLen}) AS day, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors FROM page_views WHERE ${filterPrev} GROUP BY LEFT(timestamp, ${bucketLen}) ORDER BY day ASC`, pp)) ?? []
+  }
   const prow = (await db.unsafe(
     `SELECT COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors, COUNT(DISTINCT session_id) AS sessions FROM page_views WHERE ${filterPrev}`, pp))?.[0]
   prevViews = Number(prow?.views ?? 0)
@@ -281,6 +299,7 @@ try {
   if (typeof preloaded !== 'undefined' && preloaded) {
     kpis = preloaded.kpis ?? kpis
     series = preloaded.series ?? []
+    prevSeries = preloaded.prevSeries ?? []
     pages = preloaded.pages ?? []
     referrers = preloaded.referrers ?? []
     channelRows = preloaded.channelRows ?? []
@@ -389,23 +408,33 @@ const kpiCards = [
 // visitors always (distinct visitors of a day <= that day's page views), so one shared
 // max scale keeps the visitors line at or below the views area.
 const CHART = { w: 1000, h: 200, padX: 0, padT: 14, padB: 12 }
-function buildChart(rows) {
+function buildChart(rows, prevRows) {
   const n = rows.length
+  const prev = prevRows || []
   const innerW = CHART.w - CHART.padX * 2
   const top = CHART.padT
   const plotH = CHART.h - CHART.padT - CHART.padB
   const bottom = top + plotH
-  const max = rows.reduce((m, r) => Math.max(m, Number(r.views || 0)), 0) || 1
+  // Shared y-scale across current AND previous views so the faded prev line never clips.
+  const max = Math.max(
+    rows.reduce((m, r) => Math.max(m, Number(r.views || 0)), 0),
+    prev.reduce((m, r) => Math.max(m, Number(r.views || 0)), 0),
+    1,
+  )
   const xFor = i => CHART.padX + ((i + 0.5) / n) * innerW
   const yFor = v => top + (1 - Number(v || 0) / max) * plotH
   const pts = rows.map((r, i) => {
     const views = Number(r.views || 0)
     const visitors = Number(r.visitors || 0)
+    // Align the prev period by index (same span+granularity => same bucket count): pts[i]
+    // pairs with prev[i], the equivalent bucket one period earlier, for the tooltip.
+    const pr = prev[i]
     return {
       day: r.day,
       label: r.label,
       views,
       visitors,
+      prevViews: pr ? Number(pr.views || 0) : null,
       x: xFor(i),
       vy: yFor(views),
       uy: yFor(visitors),
@@ -417,7 +446,12 @@ function buildChart(rows) {
   const area = pts.length
     ? `M${pts[0].x.toFixed(1)} ${bottom} L${pts.map(pt => `${pt.x.toFixed(1)} ${pt.vy.toFixed(1)}`).join(' L')} L${pts[pts.length - 1].x.toFixed(1)} ${bottom} Z`
     : ''
-  return { pts, viewsLine: line('vy'), visitorsLine: line('uy'), area, bottom, firstDay: pts[0]?.day, lastDay: pts[pts.length - 1]?.day, firstLabel: pts[0]?.label, lastLabel: pts[pts.length - 1]?.label, ...CHART }
+  // Prev-period line: aligned to the current x positions by index, up to the shorter
+  // of the two (defensive against a rare boundary off-by-one between the two windows).
+  const prevLine = prev.length
+    ? prev.slice(0, n).map((r, i) => `${i ? 'L' : 'M'}${xFor(i).toFixed(1)} ${yFor(Number(r.views || 0)).toFixed(1)}`).join(' ')
+    : ''
+  return { pts, viewsLine: line('vy'), visitorsLine: line('uy'), area, prevLine, bottom, firstDay: pts[0]?.day, lastDay: pts[pts.length - 1]?.day, firstLabel: pts[0]?.label, lastLabel: pts[pts.length - 1]?.label, ...CHART }
 }
 // Fill every bucket in the range so the x-axis is time-proportional: buckets with
 // no traffic become 0 (a 6-month gap no longer looks like a 1-day gap), and a
@@ -441,7 +475,7 @@ function densify(rows, fromISO, toISO) {
   }
   return out
 }
-const chart = buildChart(densify(series, from, to))
+const chart = buildChart(densify(series, from, to), compare ? densify(prevSeries, prevFrom, from) : null)
 
 // CSV export payload. Serialize the already-loaded view (no extra query). Every "<" is
 // escaped to < so the embedded JSON can never form a stray closing script tag.
@@ -458,6 +492,7 @@ const exportPayload = {
     viewsPerVisitor: kpis.visitors ? Number(curVpv.toFixed(2)) : 0,
   },
   series: series.map(s => ({ day: s.day, views: Number(s.views || 0), visitors: Number(s.visitors || 0) })),
+  prevSeries: prevSeries.map(s => ({ day: s.day, views: Number(s.views || 0), visitors: Number(s.visitors || 0) })),
   pages: pages.map(p => ({ path: p.path, views: Number(p.views || 0), visitors: Number(p.visitors || 0) })),
   referrers: referrers.map(r => ({ source: r.source, views: Number(r.views || 0) })),
   channels: channels.map(c => ({ channel: c.name, views: c.views })),
@@ -566,10 +601,13 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       </div>
       <nav class="flex gap-1.5 items-center">
         @foreach (ranges as r)
-          <a href="?site={{ siteId }}&range={{ r.key }}"
+          <a href="?site={{ siteId }}&range={{ r.key }}{{ compare ? '&compare=1' : '' }}"
             class="px-3.5 py-1.5 font-medium text-sm border pill"
             style="{{ r.key === range ? 'color: #fff; background: var(--accent); border-color: var(--accent)' : 'color: var(--text-2); border-color: var(--border)' }}">{{ r.label }}</a>
         @endforeach
+        <a href="{{ compareToggleUrl() }}" title="Overlay the previous period on the chart"
+          class="px-3.5 py-1.5 font-medium text-sm border pill"
+          style="{{ compare ? 'color: #fff; background: var(--accent); border-color: var(--accent)' : 'color: var(--text-2); border-color: var(--border)' }}">Compare</a>
         <button type="button" id="export-csv"
           class="px-3.5 py-1.5 font-medium text-sm border pill"
           style="color: var(--text-2); border-color: var(--border); background: var(--panel); cursor: pointer;">Export CSV</button>
@@ -586,7 +624,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
             <span class="fx" aria-hidden="true">×</span>
           </a>
         @endforeach
-        <a href="?site={{ siteId }}&range={{ range }}" class="ml-1 font-medium text-xs filter-clear">Clear all</a>
+        <a href="?site={{ siteId }}&range={{ range }}{{ compare ? '&compare=1' : '' }}" class="ml-1 font-medium text-xs filter-clear">Clear all</a>
       </div>
     @endif
 
@@ -620,9 +658,12 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
         <div class="flex gap-4 items-center text-xs" style="color: var(--text-2)">
           <span class="flex gap-1.5 items-center"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--accent)"></span>Views</span>
           <span class="flex gap-1.5 items-center"><span style="display:inline-block;width:14px;height:0;border-top:2px solid var(--text-3)"></span>Visitors</span>
+          @if (compare)
+            <span class="flex gap-1.5 items-center" style="opacity: 0.7"><span style="display:inline-block;width:14px;height:0;border-top:2px dashed var(--text-3)"></span>Previous</span>
+          @endif
         </div>
       </div>
-      @if (series.length)
+      @if (series.length || (compare && prevSeries.length))
         <div class="relative h-44 w-full ga-chart">
           <svg class="block h-full w-full" role="img" aria-label="Traffic over time from {{ chart.firstLabel }} to {{ chart.lastLabel }}: {{ kpis.views.toLocaleString() }} page views, {{ kpis.visitors.toLocaleString() }} unique visitors. Per-bucket figures are in the CSV export." viewBox="0 0 {{ chart.w }} {{ chart.h }}" preserveAspectRatio="none" style="overflow: visible">
             <defs>
@@ -632,6 +673,9 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
               </linearGradient>
             </defs>
             <path d="{{ chart.area }}" fill="url(#ga-fill)"/>
+            @if (chart.prevLine)
+              <path d="{{ chart.prevLine }}" fill="none" stroke="var(--text-3)" stroke-width="1.5" stroke-dasharray="3 4" opacity="0.55" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/>
+            @endif
             <path d="{{ chart.viewsLine }}" fill="none" stroke="var(--accent)" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/>
             <path d="{{ chart.visitorsLine }}" fill="none" stroke="var(--text-3)" stroke-width="1.5" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/>
           </svg>
@@ -645,6 +689,9 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
                   <div class="ga-tip-day mono">{{ pt.label }}</div>
                   <div class="ga-tip-row"><span class="ga-sw" style="background: var(--accent)"></span>Views <b class="mono">{{ pt.views.toLocaleString() }}</b></div>
                   <div class="ga-tip-row"><span class="ga-sw" style="background: var(--text-3)"></span>Visitors <b class="mono">{{ pt.visitors.toLocaleString() }}</b></div>
+                  @if (pt.prevViews !== null)
+                    <div class="ga-tip-row" style="opacity: 0.7"><span class="ga-sw" style="background: var(--text-3); opacity: 0.5"></span>Prev views <b class="mono">{{ pt.prevViews.toLocaleString() }}</b></div>
+                  @endif
                 </div>
               </div>
             @endforeach
@@ -986,6 +1033,8 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       L.push(row(['Views per visitor', data.kpis.viewsPerVisitor]))
       L.push('')
       section(L, ['Date', 'Views', 'Visitors'], data.series, function (r) { return [r.day, r.views, r.visitors] })
+      if (data.prevSeries && data.prevSeries.length)
+        section(L, ['Prev date', 'Prev views', 'Prev visitors'], data.prevSeries, function (r) { return [r.day, r.views, r.visitors] })
       section(L, ['Top page', 'Views', 'Visitors'], data.pages, function (r) { return [r.path, r.views, r.visitors] })
       section(L, ['Top source', 'Views'], data.referrers, function (r) { return [r.source, r.views] })
       section(L, ['Channel', 'Views'], data.channels, function (r) { return [r.channel, r.views] })
