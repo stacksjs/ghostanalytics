@@ -125,6 +125,7 @@ let prevSessions = 0
 let prevBounce = 0
 let liveNow = 0
 let goals = []
+let events = []
 let live = false
 
 // Race all DB work against a short timeout: if SingleStore isn't reachable, a
@@ -208,6 +209,15 @@ async function loadData() {
     WHERE g.site_id = ? AND g.is_active = 1
     GROUP BY g.id, g.name, g.value
     ORDER BY conversions DESC, g.name ASC`, [from, to, siteId])) ?? []
+  // Top custom events for this site in [from,to]: per event NAME, total count and
+  // distinct visitors. Scoped by site+range only — NOT the page_views filter engine,
+  // whose columns don't exist on custom_events (like Goals above). Grouped by NAME,
+  // not properties, so it stays SingleStore-safe (no JSON_EXTRACT).
+  events = (await db.unsafe(
+    `SELECT name, COUNT(*) AS events, COUNT(DISTINCT visitor_id) AS visitors
+    FROM custom_events
+    WHERE site_id = ? AND timestamp >= ? AND timestamp <= ?
+    GROUP BY name ORDER BY events DESC LIMIT 8`, [siteId, from, to])) ?? []
   live = true
 }
 
@@ -235,6 +245,7 @@ try {
     prevBounce = preloaded.prevBounce ?? 0
     liveNow = preloaded.liveNow ?? 0
     goals = preloaded.goals ?? []
+    events = preloaded.events ?? []
     live = true
   }
   else {
@@ -261,6 +272,8 @@ const maxUtmMedium = utmMediums.reduce((m, u) => Math.max(m, Number(u.views || 0
 // Goals: bar is scaled to the busiest goal's conversion count; rate uses the
 // range-wide distinct-visitor total (kpis.visitors), guarded against /0.
 const maxGoal = goals.reduce((m, g) => Math.max(m, Number(g.conversions || 0)), 0) || 1
+// Events: bar is scaled to the busiest event's count (site+range scoped, like goals).
+const maxEvent = events.reduce((m, e) => Math.max(m, Number(e.events || 0)), 0) || 1
 function goalRate(converters) {
   if (!kpis.visitors)
     return 0
@@ -391,6 +404,7 @@ const exportPayload = {
   utmSources: utmSources.map(s => ({ source: s.source, views: Number(s.views || 0) })),
   utmMediums: utmMediums.map(m => ({ medium: m.medium, views: Number(m.views || 0) })),
   goals: goals.map(g => ({ name: g.name, conversions: Number(g.conversions || 0), converters: Number(g.converters || 0), rate: Number(goalRate(g.converters).toFixed(2)), value: Number(g.total_value || 0) })),
+  events: events.map(e => ({ name: e.name, events: Number(e.events || 0), visitors: Number(e.visitors || 0) })),
 }
 const exportJson = JSON.stringify(exportPayload)
 </script>
@@ -705,6 +719,27 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       @endforelse
     </div>
 
+    <!-- Top events: custom events (ghost('Name', props) → custom_events) for the
+        resolved site over the range window — per event NAME, count (with a
+        proportion bar) and distinct visitors. Scoped by site+range only (custom_events
+        lacks the page_views filter columns), like the Goals panel above. Empty by
+        default (custom_events nearly empty) → "No events yet." -->
+    <div class="mt-6 p-5 panel reveal">
+      <h2 class="mb-4 font-semibold text-xs tracking-wider uppercase" style="color: var(--text-3)">Events</h2>
+      @forelse (events as e)
+        <div class="flex relative items-center justify-between -mx-1 px-1 py-2.5 text-sm">
+          <div class="absolute inset-y-1 left-0 rounded" style="width: {{ Math.round((Number(e.events) / maxEvent) * 100) }}%; background: var(--bar);"></div>
+          <span class="relative pr-2 truncate ga-row-label" style="color: var(--text-2)">{{ e.name }}</span>
+          <span class="flex relative gap-3.5 items-baseline">
+            <span class="tabular-nums mono" style="color: var(--text-3)">{{ Number(e.visitors).toLocaleString() }}</span>
+            <span class="font-medium tabular-nums mono">{{ Number(e.events).toLocaleString() }}</span>
+          </span>
+        </div>
+      @empty
+        <div class="py-8 text-center text-sm" style="color: var(--text-3)">No events yet.</div>
+      @endforelse
+    </div>
+
     <!-- Campaigns (UTM): full-width Top campaigns + a 2-up grid of UTM sources / mediums -->
     <div class="mt-6 p-5 panel reveal">
       <h2 class="mb-4 font-semibold text-xs tracking-wider uppercase" style="color: var(--text-3)">Top campaigns</h2>
@@ -851,6 +886,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       section(L, ['UTM source', 'Views'], data.utmSources, function (r) { return [r.source, r.views] })
       section(L, ['UTM medium', 'Views'], data.utmMediums, function (r) { return [r.medium, r.views] })
       section(L, ['Goal', 'Conversions', 'Rate %', 'Value'], data.goals, function (r) { return [r.name, r.conversions, r.rate, r.value] })
+      section(L, ['Event', 'Events', 'Visitors'], data.events, function (r) { return [r.name, r.events, r.visitors] })
       var csv = '﻿' + L.join('\r\n')
       var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
       var url = URL.createObjectURL(blob)

@@ -384,6 +384,23 @@ route.get('/script.js', (request: any) => {
     fetch('${origin}/collect',{method:'POST',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
   }catch(_){}}
   w.ghost=function(name,props){send(name,props)};
+  var DLRE=/\.(pdf|zip|dmg|exe|csv|xlsx?|docx?|pptx?|mp3|mp4|pkg|rar|gz|tar|wav|avi|mov|mkv|txt|svg)$/i;
+  function onLink(ev){
+    if(ev.type==='auxclick'&&ev.button!==1)return;
+    try{
+      var t=ev.target,a=t&&t.closest?t.closest('a'):null;
+      if(!a)return;
+      var href=a.getAttribute('href');if(!href)return;
+      if(/^(javascript:|mailto:|tel:)/i.test(href))return;
+      var url=new URL(a.href,location.href);
+      if(url.protocol!=='http:'&&url.protocol!=='https:')return;
+      var cross=url.hostname!==location.hostname,path=url.pathname;
+      if((a.hasAttribute('download')&&!cross)||DLRE.test(path)){send('File Download',{url:a.href});return}
+      if(cross){send('Outbound Link',{url:a.href})}
+    }catch(_){}
+  }
+  d.addEventListener('click',onLink,true);
+  d.addEventListener('auxclick',onLink,true);
   function pv(){send('pageview')}
   pv();
   var push=history.pushState;history.pushState=function(){push.apply(this,arguments);pv()};
