@@ -47,6 +47,7 @@ const CH_SOCIAL = new Set(['twitter', 'x', 'facebook', 'instagram', 'linkedin', 
 const FILTERS = {
   path: { col: 'path', label: 'Path' },
   source: { col: 'referrer_source', label: 'Source' },
+  referrer: { col: 'referrer', label: 'Referrer' },
   channel: { col: null, label: 'Channel' },
   country: { col: 'country', label: 'Country' },
   device: { col: 'device_type', label: 'Device' },
@@ -156,6 +157,7 @@ let series = []
 let prevSeries = []
 let pages = []
 let referrers = []
+let referrerUrls = []
 let countries = []
 let devices = []
 let browsers = []
@@ -234,6 +236,11 @@ async function loadData() {
      ) t WHERE t.rn = 1 GROUP BY path ORDER BY exits DESC LIMIT 8`, sessionP)) ?? []
   referrers = (await db.unsafe(
     `SELECT referrer_source AS source, COUNT(*) AS views FROM page_views WHERE ${filter} GROUP BY referrer_source ORDER BY views DESC LIMIT 8`, p)) ?? []
+  // Top referrers: the actual referring URLs (full referrer), distinct from the normalized
+  // referrer_source above (e.g. news.ycombinator.com/ vs "Hacker News"). Excludes empty/
+  // direct. Filter-aware via the shared filter/p; referrer is a page_views column.
+  referrerUrls = (await db.unsafe(
+    `SELECT referrer AS url, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors FROM page_views WHERE ${filter} AND referrer IS NOT NULL AND referrer != '' GROUP BY referrer ORDER BY views DESC LIMIT 8`, p)) ?? []
   // All sources (no LIMIT) so each can be folded into a channel below.
   channelRows = (await db.unsafe(
     `SELECT referrer_source AS source, COUNT(*) AS views FROM page_views WHERE ${filter} GROUP BY referrer_source`, p)) ?? []
@@ -334,6 +341,7 @@ try {
     prevSeries = preloaded.prevSeries ?? []
     pages = preloaded.pages ?? []
     referrers = preloaded.referrers ?? []
+    referrerUrls = preloaded.referrerUrls ?? []
     channelRows = preloaded.channelRows ?? []
     campaigns = preloaded.campaigns ?? []
     utmSources = preloaded.utmSources ?? []
@@ -372,6 +380,7 @@ const maxPage = pages.reduce((m, p) => Math.max(m, Number(p.views || 0)), 0) || 
 const maxEntry = entryPages.reduce((m, e) => Math.max(m, Number(e.entries || 0)), 0) || 1
 const maxExit = exitPages.reduce((m, e) => Math.max(m, Number(e.exits || 0)), 0) || 1
 const maxRef = referrers.reduce((m, r) => Math.max(m, Number(r.views || 0)), 0) || 1
+const maxReferrerUrl = referrerUrls.reduce((m, r) => Math.max(m, Number(r.views || 0)), 0) || 1
 const maxCountry = countries.reduce((m, c) => Math.max(m, Number(c.views || 0)), 0) || 1
 const maxDevice = devices.reduce((m, d) => Math.max(m, Number(d.views || 0)), 0) || 1
 const maxBrowser = browsers.reduce((m, b) => Math.max(m, Number(b.views || 0)), 0) || 1
@@ -513,8 +522,9 @@ function densify(rows, fromISO, toISO) {
 }
 const chart = buildChart(densify(series, from, to), compare ? densify(prevSeries, prevFrom, from) : null)
 
-// CSV export payload. Serialize the already-loaded view (no extra query). Every "<" is
-// escaped to < so the embedded JSON can never form a stray closing script tag.
+// CSV export payload. Serialize the already-loaded view (no extra query). It rides in a
+// data-export="{{ exportJson }}" attribute, so stx {{ }} attribute-escaping neutralizes any
+// "<"/quote in the JSON (the DOM decodes on read, JSON.parse restores it) — safe as-is.
 const exportPayload = {
   site: siteId,
   range,
@@ -531,6 +541,7 @@ const exportPayload = {
   prevSeries: prevSeries.map(s => ({ day: s.day, views: Number(s.views || 0), visitors: Number(s.visitors || 0) })),
   pages: pages.map(p => ({ path: p.path, views: Number(p.views || 0), visitors: Number(p.visitors || 0) })),
   referrers: referrers.map(r => ({ source: r.source, views: Number(r.views || 0) })),
+  referrerUrls: referrerUrls.map(r => ({ url: r.url, views: Number(r.views || 0), visitors: Number(r.visitors || 0) })),
   channels: channels.map(c => ({ channel: c.name, views: c.views })),
   countries: countries.map(c => ({ country: c.country, views: Number(c.views || 0) })),
   devices: devices.map(d => ({ device: d.device, views: Number(d.views || 0) })),
@@ -895,6 +906,25 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       @endforelse
     </div>
 
+    <!-- Top referrers: the actual referring URLs (full referrer), a drill-down beneath the
+        normalized Top sources / channels. Clickable to filter; excludes empty/direct traffic.
+        {{ }} escapes the (beacon-supplied) url. -->
+    <div class="mt-6 p-5 panel reveal">
+      <h2 class="mb-4 font-semibold text-xs tracking-wider uppercase" style="color: var(--text-3)">Referrers</h2>
+      @forelse (referrerUrls as r)
+        <a href="{{ addFilterUrl('referrer', r.url) }}" class="relative items-center justify-between -mx-1 px-1 py-2.5 text-sm ga-row">
+          <div class="absolute inset-y-1 left-0 rounded" style="width: {{ Math.round((Number(r.views) / maxReferrerUrl) * 100) }}%; background: var(--bar);"></div>
+          <span class="relative pr-2 truncate ga-row-label mono" style="color: var(--text-2)">{{ r.url }}</span>
+          <span class="flex relative gap-3.5 items-baseline">
+            <span class="tabular-nums mono" style="color: var(--text-3)" title="Unique visitors">{{ Number(r.visitors).toLocaleString() }}</span>
+            <span class="font-medium tabular-nums mono" title="Views">{{ Number(r.views).toLocaleString() }}</span>
+          </span>
+        </a>
+      @empty
+        <div class="py-8 text-center text-sm" style="color: var(--text-3)">No referrers yet.</div>
+      @endforelse
+    </div>
+
     <!-- Goals & conversions: per active goal in range — conversions (with a
         proportion bar), conversion rate (converters / distinct visitors), and
         total value. Empty by default (no goals seeded) → "No goals yet." -->
@@ -1113,6 +1143,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       section(L, ['Top page', 'Views', 'Visitors'], data.pages, function (r) { return [r.path, r.views, r.visitors] })
       section(L, ['Top source', 'Views'], data.referrers, function (r) { return [r.source, r.views] })
       section(L, ['Channel', 'Views'], data.channels, function (r) { return [r.channel, r.views] })
+      section(L, ['Referrer', 'Views', 'Visitors'], data.referrerUrls, function (r) { return [r.url, r.views, r.visitors] })
       section(L, ['Country', 'Views'], data.countries, function (r) { return [r.country, r.views] })
       section(L, ['Device', 'Views'], data.devices, function (r) { return [r.device, r.views] })
       section(L, ['Browser', 'Views'], data.browsers, function (r) { return [r.browser, r.views] })

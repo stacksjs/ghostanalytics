@@ -51,6 +51,17 @@ function utmParam(v: unknown): string | null {
   return t ? t.slice(0, 255) : null
 }
 
+// Clip a user-supplied string to the varchar(255) column width so an over-long value can't
+// overflow the page_views insert — an overflow 500s the beacon on strict MySQL (dropping the
+// whole pageview) or silently truncates on SingleStore. Used for referrer/title, which the
+// tracker sends untruncated (UTMs already go through utmParam's cap).
+function clip255(v: unknown): string | null {
+  if (v == null)
+    return null
+  const s = String(v)
+  return s.length > 255 ? s.slice(0, 255) : s
+}
+
 /**
  * Goal-matching contract. A goal targets either a `pageview` (matched against
  * the page path) or an `event` (matched against the custom event name), using
@@ -124,7 +135,7 @@ route.post('/collect', async (request: any) => {
     url = body.u ? new URL(body.u) : null
   }
   catch { /* ignore malformed url */ }
-  const path = url?.pathname ?? '/'
+  const path = clip255(url?.pathname) ?? '/'
   const source = referrerSource(body.r)
 
   // Ensure the site row exists before any child insert. sessions, page_views,
@@ -143,7 +154,7 @@ route.post('/collect', async (request: any) => {
     visitor_id: visitorId,
     entry_path: path,
     exit_path: path,
-    referrer: body.r ?? null,
+    referrer: clip255(body.r),
     referrer_source: source,
     country: country ?? null,
     device_type: info.deviceType,
@@ -165,8 +176,8 @@ route.post('/collect', async (request: any) => {
       visitor_id: visitorId,
       path,
       hostname: url?.hostname ?? null,
-      title: body.t ?? null,
-      referrer: body.r ?? null,
+      title: clip255(body.t),
+      referrer: clip255(body.r),
       referrer_source: source,
       utm_source: utmParam(body.utm_source),
       utm_medium: utmParam(body.utm_medium),
