@@ -110,7 +110,7 @@ export default {
 
   DB_CONNECTION: {
     validation: schema.enum(['mysql', 'sqlite', 'postgres']),
-    default: 'mysql',
+    default: 'postgres',
   },
 
   DB_HOST: {
@@ -120,7 +120,7 @@ export default {
 
   DB_PORT: {
     validation: schema.number(),
-    default: 3306,
+    default: 5432,
   },
 
   AWS_ACCOUNT_ID: {

@@ -3,7 +3,7 @@
  *
  * The public tracker (served at `/script.js`) beacons page views and custom
  * events to `POST /collect`. The dashboard reads aggregates from the
- * `GET /api/sites/{siteId}/*` endpoints. All storage is SingleStore, queried
+ * `GET /api/sites/{siteId}/*` endpoints. All storage is PostgreSQL, queried
  * through bun-query-builder's `db`.
  */
 
@@ -19,6 +19,21 @@ import {
   randomId,
   referrerSource,
 } from '../app/Analytics/tracking'
+
+/**
+ * Postgres positional-placeholder shim. bun-query-builder's `db.unsafe()` passes
+ * SQL through verbatim, and Postgres binds with `$1..$n`, not MySQL's `?`. Rewrite
+ * each `?` to `$n` in order so the existing `?`-style queries — including the
+ * dynamically-built filter fragments whose placeholder count varies — run
+ * unchanged on Postgres. No-op on dialects that use `?` (sqlite/mysql). This is
+ * the ONLY placeholder style used in this file; there are no literal `?` in any
+ * SQL string, so the blanket replace is safe.
+ */
+const IS_PG = (process.env.DB_CONNECTION ?? 'postgres') === 'postgres'
+function pgq(sql: string, params?: unknown[]): Promise<any> {
+  const bound = IS_PG ? ((): string => { let i = 0; return sql.replace(/\?/g, () => `$${++i}`) })() : sql
+  return db.unsafe(bound, params ?? []) as Promise<any>
+}
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -52,9 +67,9 @@ function utmParam(v: unknown): string | null {
 }
 
 // Clip a user-supplied string to the varchar(255) column width so an over-long value can't
-// overflow the page_views insert — an overflow 500s the beacon on strict MySQL (dropping the
-// whole pageview) or silently truncates on SingleStore. Used for referrer/title, which the
-// tracker sends untruncated (UTMs already go through utmParam's cap).
+// overflow the page_views insert — on Postgres an over-length varchar insert errors (22001),
+// which would 500 the beacon and, via the sessions FK, drop the whole pageview. Used for
+// referrer/title, which the tracker sends untruncated (UTMs already go through utmParam's cap).
 function clip255(v: unknown): string | null {
   if (v == null)
     return null
@@ -99,7 +114,7 @@ function matchesGoal(
 
 /**
  * Deterministic conversion id = sha256(session_id|goal_id), truncated. Combined
- * with insertOrIgnore (which emits `INSERT IGNORE` on the mysql/SingleStore
+ * with insertOrIgnore (which emits `ON CONFLICT DO NOTHING` on the postgres
  * dialect), this enforces exactly one conversion per session per goal: a repeat
  * beacon in the same session recomputes the same id and the insert is a no-op.
  */
@@ -134,11 +149,11 @@ route.post('/collect', async (request: any) => {
   // a beacon during a DB blip) compute the SAME id and the sessions insertOrIgnore dedups them
   // into one session instead of racing into two. Accepted cookieless trade-offs (as in
   // Fathom/Plausible): a visitor whose IP changes mid-visit, or a visit crossing the daily
-  // visitor-salt rotation at UTC midnight, starts a new session. TODO(scale): this per-beacon
-  // lookup is a non-shard-key fan-out on SingleStore — cache the active session when traffic warrants.
+  // visitor-salt rotation at UTC midnight, starts a new session. This per-beacon lookup rides the
+  // page_views(site_id, visitor_id) index on Postgres; cache the active session if it ever gets hot.
   const SESSION_WINDOW_MS = 30 * 60 * 1000
   const sessionSince = new Date(Date.now() - SESSION_WINDOW_MS).toISOString()
-  const recentSession = (await db.unsafe(
+  const recentSession = (await pgq(
     `SELECT session_id FROM page_views WHERE site_id = ? AND visitor_id = ? AND timestamp >= ? ORDER BY timestamp DESC LIMIT 1`,
     [String(siteId), visitorId, sessionSince],
   ).catch(() => [])) as Array<{ session_id: string }>
@@ -226,9 +241,8 @@ route.post('/collect', async (request: any) => {
       let url = String(body.p.url)
       props = JSON.stringify({ url })
       // properties is varchar(255): trim the url until the wrapped JSON fits, so it stays
-      // valid JSON (the dashboard JSON.parses it) and never overflows the column — an
-      // overflow would 500 on strict MySQL or, on SingleStore, silently truncate and then
-      // collate distinct urls that share a 255-char prefix into one row. Only pathologically
+      // valid JSON (the dashboard JSON.parses it) and never overflows the column — on Postgres
+      // an over-length varchar insert errors (22001) and would 500 the beacon. Only pathologically
       // long hrefs hit the loop. (TODO: widen custom_events.properties for full-length urls.)
       while (props.length > 255 && url.length) {
         url = url.slice(0, -8)
@@ -258,14 +272,14 @@ route.post('/collect', async (request: any) => {
   try {
     const isPageview = event === 'pageview'
     const eventName = String(event)
-    const goals = await db.unsafe(
-      `SELECT id, type, pattern, match_type, value FROM goals WHERE site_id = ? AND is_active = 1 LIMIT 100`,
+    const goals = await pgq(
+      `SELECT id, type, pattern, match_type, value FROM goals WHERE site_id = ? AND is_active = true LIMIT 100`,
       [String(siteId)],
     )
     for (const goal of (goals ?? []) as GoalRow[]) {
       if (!matchesGoal(goal, { isPageview, path, eventName }))
         continue
-      // Deterministic id + INSERT IGNORE => once per session per goal. Stores the
+      // Deterministic id + ON CONFLICT DO NOTHING => once per session per goal. Stores the
       // goal's value and this beacon's attribution + timestamp.
       await db.insertOrIgnore('conversions', {
         id: conversionId(sessionId, goal.id),
@@ -309,7 +323,7 @@ route.options('/api/sites/{siteId}/goals', () => new Response(null, { status: 20
 
 route.get('/api/sites/{siteId}/goals', async (request: any) => {
   const siteId = request.params.siteId
-  const rows = await db.unsafe(
+  const rows = await pgq(
     `SELECT id, site_id, name, type, pattern, match_type, value, is_active
     FROM goals WHERE site_id = ? ORDER BY created_at DESC`,
     [siteId],
@@ -338,7 +352,7 @@ route.post('/api/sites/{siteId}/goals', async (request: any) => {
     return json({ error: 'value must be a finite number' }, 400)
 
   // Cap active goals per site to bound the /collect matching loop (defense-in-depth).
-  const activeCount = (await db.unsafe(`SELECT COUNT(*) AS n FROM goals WHERE site_id = ? AND is_active = 1`, [String(siteId)]))?.[0]?.n
+  const activeCount = (await pgq(`SELECT COUNT(*) AS n FROM goals WHERE site_id = ? AND is_active = true`, [String(siteId)]))?.[0]?.n
   if (Number(activeCount ?? 0) >= 50)
     return json({ error: 'active goal limit reached (50)' }, 409)
 
@@ -368,7 +382,7 @@ route.post('/api/sites/{siteId}/goals', async (request: any) => {
 route.get('/api/sites/{siteId}/stats', async (request: any) => {
   const siteId = request.params.siteId
   const { from, to } = window(request)
-  const row = (await db.unsafe(
+  const row = (await pgq(
     `SELECT COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors, COUNT(DISTINCT session_id) AS sessions
     FROM page_views WHERE site_id = ? AND timestamp >= ? AND timestamp <= ?`,
     [siteId, from, to],
@@ -384,7 +398,7 @@ route.get('/api/sites/{siteId}/stats', async (request: any) => {
 route.get('/api/sites/{siteId}/timeseries', async (request: any) => {
   const siteId = request.params.siteId
   const { from, to } = window(request)
-  const rows = await db.unsafe(
+  const rows = await pgq(
     `SELECT LEFT(timestamp, 10) AS day, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors
     FROM page_views WHERE site_id = ? AND timestamp >= ? AND timestamp <= ?
     GROUP BY LEFT(timestamp, 10) ORDER BY day ASC`,
@@ -396,7 +410,7 @@ route.get('/api/sites/{siteId}/timeseries', async (request: any) => {
 route.get('/api/sites/{siteId}/pages', async (request: any) => {
   const siteId = request.params.siteId
   const { from, to } = window(request)
-  const rows = await db.unsafe(
+  const rows = await pgq(
     `SELECT path, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors
     FROM page_views WHERE site_id = ? AND timestamp >= ? AND timestamp <= ?
     GROUP BY path ORDER BY views DESC LIMIT 20`,
@@ -408,7 +422,7 @@ route.get('/api/sites/{siteId}/pages', async (request: any) => {
 route.get('/api/sites/{siteId}/referrers', async (request: any) => {
   const siteId = request.params.siteId
   const { from, to } = window(request)
-  const rows = await db.unsafe(
+  const rows = await pgq(
     `SELECT referrer_source AS source, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors
     FROM page_views WHERE site_id = ? AND timestamp >= ? AND timestamp <= ?
     GROUP BY referrer_source ORDER BY views DESC LIMIT 20`,

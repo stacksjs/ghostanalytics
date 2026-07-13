@@ -1,9 +1,9 @@
 <script server>
-// ghostanalytics dashboard. Queries SingleStore for the selected site + range;
+// ghostanalytics dashboard. Queries PostgreSQL for the selected site + range;
 // falls back to an empty state when the database isn't reachable yet, so the
-// page always renders. Populates for real once DB_CONNECTION=singlestore points
-// at a live cluster. DB access is behind a dynamic import inside try/catch so a
-// standalone render (no DB module / no cluster) still produces the empty state.
+// page always renders. Populates for real once DB_CONNECTION=postgres points
+// at a live database. DB access is behind a dynamic import inside try/catch so a
+// standalone render (no DB module / no database) still produces the empty state.
 const meta = { title: 'ghostanalytics - Dashboard', description: 'Privacy-first web analytics' }
 
 // Query params reach server scripts via globalThis.__stxServeSearch (the serve
@@ -17,7 +17,7 @@ const to = new Date().toISOString()
 // Chart bucket width: hourly for short spans (<= 2 days) so a 24h view shows a real
 // curve instead of one dot, else daily. bucketLen = the LEFT(timestamp, N) prefix
 // length — 'YYYY-MM-DDTHH' (13) vs 'YYYY-MM-DD' (10). String-prefix bucketing (no
-// date math) stays MySQL/SingleStore-safe, same as the daily chart.
+// date math) stays MySQL/dialect-portable, same as the daily chart.
 const hourly = days <= 2
 const bucketLen = hourly ? 13 : 10
 // Last ~5 minutes; ISO string compares lexicographically against the ISO timestamp column.
@@ -139,7 +139,7 @@ function compareToggleUrl() {
 // --------------------------------------------------------------------------
 
 // Outbound Link / File Download events store {"url":"..."} in properties (the tracker
-// sends only that key), so GROUP BY properties == GROUP BY url — SingleStore-safe (a plain
+// sends only that key), so GROUP BY properties == GROUP BY url — dialect-portable (a plain
 // varchar group, no JSON_EXTRACT). eventUrl unwraps it for display; falls back to the raw
 // string if it isn't the expected shape.
 function eventUrl(props) {
@@ -180,16 +180,23 @@ let entryPages = []
 let exitPages = []
 let live = false
 
-// Race all DB work against a short timeout: if SingleStore isn't reachable, a
+// Race all DB work against a short timeout: if PostgreSQL isn't reachable, a
 // TCP connect can hang far longer than a render should wait, so we bail to the
 // empty state after 5s rather than block the page.
 async function loadData() {
   const { db } = await import('@stacksjs/database')
+  // Postgres binds positional params as $1..$n, not MySQL's `?`. Rewrite each `?`
+  // to `$n` in order so the `?`-style queries below — including the variable-length
+  // filter fragments (filterSql/sessionFilterSql) whose placeholder count varies —
+  // run on Postgres unchanged. No-op on `?`-dialects (sqlite/mysql). No literal `?`
+  // appears in any SQL string here, so the blanket rewrite is safe.
+  const IS_PG = ((globalThis.process && globalThis.process.env && globalThis.process.env.DB_CONNECTION) || 'postgres') === 'postgres'
+  const pgq = (sql, params) => db.unsafe(IS_PG ? (() => { let i = 0; return sql.replace(/\?/g, () => `$${++i}`) })() : sql, params ?? [])
   // With no explicit ?site=, land on the busiest site so the dashboard shows
   // real data out of the box (multi-tenant apps would scope this to the
   // authenticated user's sites instead).
   if (siteId === 'demo') {
-    const t = await db.unsafe('SELECT site_id FROM page_views GROUP BY site_id ORDER BY COUNT(*) DESC LIMIT 1')
+    const t = await pgq('SELECT site_id FROM page_views GROUP BY site_id ORDER BY COUNT(*) DESC LIMIT 1')
     if (t?.[0]?.site_id)
       siteId = t[0].site_id
   }
@@ -202,23 +209,23 @@ async function loadData() {
   const sessionP = [siteId, from, to, ...sessionFilterParams]
   const sessionFilter = `site_id = ? AND timestamp >= ? AND timestamp <= ?${sessionFilterSql}`
 
-  const row = (await db.unsafe(
+  const row = (await pgq(
     `SELECT COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors, COUNT(DISTINCT session_id) AS sessions FROM page_views WHERE ${filter}`, p))?.[0]
   kpis = { views: Number(row?.views ?? 0), visitors: Number(row?.visitors ?? 0), sessions: Number(row?.sessions ?? 0) }
-  series = (await db.unsafe(
+  series = (await pgq(
     `SELECT LEFT(timestamp, ${bucketLen}) AS day, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors FROM page_views WHERE ${filter} GROUP BY LEFT(timestamp, ${bucketLen}) ORDER BY day ASC`, p)) ?? []
-  pages = (await db.unsafe(
+  pages = (await pgq(
     `SELECT path, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors FROM page_views WHERE ${filter} GROUP BY path ORDER BY views DESC LIMIT 8`, p)) ?? []
   // Entry / exit pages: the FIRST and LAST page_view of each session (the tracker
   // never updates sessions.exit_path, so derive from page_views like bounce rate).
   // ROW_NUMBER windows per session by time (id as a deterministic tiebreaker);
-  // filter-aware via the shared filter/p. Portable across MySQL 8+ and SingleStore.
+  // filter-aware via the shared filter/p. Portable across Postgres and other SQL engines.
   // Entry pages also carry a per-page bounce rate: a second window (COUNT(*) OVER
   // the session) gives each session's total page views in the same pass, so the
-  // entry row (rn = 1) knows if its session bounced (pv = 1). SUM(pv = 1) per entry
+  // entry row (rn = 1) knows if its session bounced (pv = 1). SUM((pv = 1)::int) per entry
   // page, over top-8, sums to the same bounced/sessions as the overall bounce KPI.
-  entryPages = (await db.unsafe(
-    `SELECT path, COUNT(*) AS entries, COUNT(DISTINCT visitor_id) AS visitors, SUM(pv = 1) AS bounces FROM (
+  entryPages = (await pgq(
+    `SELECT path, COUNT(*) AS entries, COUNT(DISTINCT visitor_id) AS visitors, SUM((pv = 1)::int) AS bounces FROM (
        SELECT path, visitor_id,
               ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY timestamp ASC, id ASC) AS rn,
               COUNT(*)    OVER (PARTITION BY session_id) AS pv
@@ -229,39 +236,39 @@ async function loadData() {
   // row (so the rn=1 entry row knows if pv=1 => bounced). Adding an ORDER BY here would
   // switch it to a running count (entry row always sees pv=1) and silently report ~100%
   // bounce on every entry page. Do not add one.
-  exitPages = (await db.unsafe(
+  exitPages = (await pgq(
     `SELECT path, COUNT(*) AS exits, COUNT(DISTINCT visitor_id) AS visitors FROM (
        SELECT path, visitor_id, ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY timestamp DESC, id DESC) AS rn
        FROM page_views WHERE ${sessionFilter}
      ) t WHERE t.rn = 1 GROUP BY path ORDER BY exits DESC LIMIT 8`, sessionP)) ?? []
-  referrers = (await db.unsafe(
+  referrers = (await pgq(
     `SELECT referrer_source AS source, COUNT(*) AS views FROM page_views WHERE ${filter} GROUP BY referrer_source ORDER BY views DESC LIMIT 8`, p)) ?? []
   // Top referrers: the actual referring URLs (full referrer), distinct from the normalized
   // referrer_source above (e.g. news.ycombinator.com/ vs "Hacker News"). Excludes empty/
   // direct. Filter-aware via the shared filter/p; referrer is a page_views column.
-  referrerUrls = (await db.unsafe(
+  referrerUrls = (await pgq(
     `SELECT referrer AS url, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors FROM page_views WHERE ${filter} AND referrer IS NOT NULL AND referrer != '' GROUP BY referrer ORDER BY views DESC LIMIT 8`, p)) ?? []
   // All sources (no LIMIT) so each can be folded into a channel below.
-  channelRows = (await db.unsafe(
+  channelRows = (await pgq(
     `SELECT referrer_source AS source, COUNT(*) AS views FROM page_views WHERE ${filter} GROUP BY referrer_source`, p)) ?? []
-  campaigns = (await db.unsafe(
+  campaigns = (await pgq(
     `SELECT utm_campaign AS campaign, COUNT(*) AS views FROM page_views WHERE ${filter} AND utm_campaign IS NOT NULL AND utm_campaign != '' GROUP BY utm_campaign ORDER BY views DESC LIMIT 8`, p)) ?? []
-  utmSources = (await db.unsafe(
+  utmSources = (await pgq(
     `SELECT utm_source AS source, COUNT(*) AS views FROM page_views WHERE ${filter} AND utm_source IS NOT NULL AND utm_source != '' GROUP BY utm_source ORDER BY views DESC LIMIT 8`, p)) ?? []
-  utmMediums = (await db.unsafe(
+  utmMediums = (await pgq(
     `SELECT utm_medium AS medium, COUNT(*) AS views FROM page_views WHERE ${filter} AND utm_medium IS NOT NULL AND utm_medium != '' GROUP BY utm_medium ORDER BY views DESC LIMIT 8`, p)) ?? []
-  countries = (await db.unsafe(
+  countries = (await pgq(
     `SELECT country, COUNT(*) AS views FROM page_views WHERE ${filter} AND country IS NOT NULL AND country != '' GROUP BY country ORDER BY views DESC LIMIT 8`, p)) ?? []
-  devices = (await db.unsafe(
+  devices = (await pgq(
     `SELECT device_type AS device, COUNT(*) AS views FROM page_views WHERE ${filter} AND device_type IS NOT NULL AND device_type != '' GROUP BY device_type ORDER BY views DESC LIMIT 8`, p)) ?? []
-  browsers = (await db.unsafe(
+  browsers = (await pgq(
     `SELECT browser, COUNT(*) AS views FROM page_views WHERE ${filter} AND browser IS NOT NULL AND browser != '' GROUP BY browser ORDER BY views DESC LIMIT 8`, p)) ?? []
-  systems = (await db.unsafe(
+  systems = (await pgq(
     `SELECT os, COUNT(*) AS views FROM page_views WHERE ${filter} AND os IS NOT NULL AND os != '' GROUP BY os ORDER BY views DESC LIMIT 8`, p)) ?? []
   // Bounce rate = share of sessions with exactly one page view (the tracker
   // doesn't maintain sessions.is_bounce, so derive it from page_views).
-  const b = (await db.unsafe(
-    `SELECT COUNT(*) AS sessions, SUM(pv = 1) AS bounced FROM (SELECT session_id, COUNT(*) AS pv FROM page_views WHERE ${filter} GROUP BY session_id) t`, p))?.[0]
+  const b = (await pgq(
+    `SELECT COUNT(*) AS sessions, SUM((pv = 1)::int) AS bounced FROM (SELECT session_id, COUNT(*) AS pv FROM page_views WHERE ${filter} GROUP BY session_id) t`, p))?.[0]
   bounceRate = Number(b?.sessions) ? Math.round((Number(b.bounced) / Number(b.sessions)) * 100) : 0
   // Previous period (same length, immediately before) for trend deltas. prevFrom is
   // module-scoped (hoisted so the chart can reuse it); pp/filterPrev bind it here.
@@ -271,19 +278,19 @@ async function loadData() {
   // Previous-period timeseries (only when the compare overlay is on): same bucket width
   // as the current series, over [prevFrom, from). Honors the full filter (pageview count).
   if (compare) {
-    prevSeries = (await db.unsafe(
+    prevSeries = (await pgq(
       `SELECT LEFT(timestamp, ${bucketLen}) AS day, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors FROM page_views WHERE ${filterPrev} GROUP BY LEFT(timestamp, ${bucketLen}) ORDER BY day ASC`, pp)) ?? []
   }
-  const prow = (await db.unsafe(
+  const prow = (await pgq(
     `SELECT COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors, COUNT(DISTINCT session_id) AS sessions FROM page_views WHERE ${filterPrev}`, pp))?.[0]
   prevViews = Number(prow?.views ?? 0)
   prevVisitors = Number(prow?.visitors ?? 0)
   prevSessions = Number(prow?.sessions ?? 0)
-  const pb = (await db.unsafe(
-    `SELECT COUNT(*) AS sessions, SUM(pv = 1) AS bounced FROM (SELECT session_id, COUNT(*) AS pv FROM page_views WHERE ${filterPrev} GROUP BY session_id) t`, pp))?.[0]
+  const pb = (await pgq(
+    `SELECT COUNT(*) AS sessions, SUM((pv = 1)::int) AS bounced FROM (SELECT session_id, COUNT(*) AS pv FROM page_views WHERE ${filterPrev} GROUP BY session_id) t`, pp))?.[0]
   prevBounce = Number(pb?.sessions) ? Math.round((Number(pb.bounced) / Number(pb.sessions)) * 100) : 0
   // Unique visitors in the last ~5 minutes (reuses the resolved siteId).
-  const lv = (await db.unsafe(
+  const lv = (await pgq(
     `SELECT COUNT(DISTINCT visitor_id) AS current FROM page_views WHERE site_id = ? AND timestamp >= ?${filterSql}`,
     [siteId, liveFrom, ...filterParams]))?.[0]
   liveNow = Number(lv?.current ?? 0)
@@ -293,36 +300,36 @@ async function loadData() {
   // page_views filter engine, whose columns (country/device/os/utm_medium/channel)
   // don't exist on the conversions table. Rate denominator (below) uses
   // kpis.visitors, which does honor filterSql. duration_minutes goals: future.
-  goals = (await db.unsafe(
+  goals = (await pgq(
     `SELECT g.id, g.name AS name, g.value AS goal_value,
             COUNT(c.id) AS conversions,
             COUNT(DISTINCT c.visitor_id) AS converters,
             COALESCE(SUM(c.value), 0) AS total_value
     FROM goals g
     LEFT JOIN conversions c ON c.goal_id = g.id AND c.timestamp >= ? AND c.timestamp <= ?
-    WHERE g.site_id = ? AND g.is_active = 1
+    WHERE g.site_id = ? AND g.is_active = true
     GROUP BY g.id, g.name, g.value
     ORDER BY conversions DESC, g.name ASC`, [from, to, siteId])) ?? []
   // Top custom events for this site in [from,to]: per event NAME, total count and
   // distinct visitors. Scoped by site+range only — NOT the page_views filter engine,
   // whose columns don't exist on custom_events (like Goals above). Grouped by NAME,
-  // not properties, so it stays SingleStore-safe (no JSON_EXTRACT).
-  events = (await db.unsafe(
+  // not properties, so it stays dialect-portable (no JSON_EXTRACT).
+  events = (await pgq(
     `SELECT name, COUNT(*) AS events, COUNT(DISTINCT visitor_id) AS visitors
     FROM custom_events
     WHERE site_id = ? AND timestamp >= ? AND timestamp <= ?
     GROUP BY name ORDER BY events DESC LIMIT 8`, [siteId, from, to])) ?? []
   // Top outbound links / file downloads: the URLs behind the auto-tracked Outbound Link
   // and File Download events. GROUP BY the whole properties varchar (== GROUP BY url, since
-  // the tracker sends only {url}) so it stays SingleStore-safe (no JSON_EXTRACT); eventUrl
+  // the tracker sends only {url}) so it stays dialect-portable (no JSON_EXTRACT); eventUrl
   // unwraps the JSON for display. Site+range scoped like Events (custom_events has no filter cols).
-  const outRows = (await db.unsafe(
+  const outRows = (await pgq(
     `SELECT properties, COUNT(*) AS clicks, COUNT(DISTINCT visitor_id) AS visitors
     FROM custom_events
     WHERE site_id = ? AND name = ? AND timestamp >= ? AND timestamp <= ? AND properties IS NOT NULL
     GROUP BY properties ORDER BY clicks DESC LIMIT 8`, [siteId, 'Outbound Link', from, to])) ?? []
   outboundLinks = outRows.map(r => ({ url: eventUrl(r.properties), clicks: Number(r.clicks || 0), visitors: Number(r.visitors || 0) }))
-  const dlRows = (await db.unsafe(
+  const dlRows = (await pgq(
     `SELECT properties, COUNT(*) AS clicks, COUNT(DISTINCT visitor_id) AS visitors
     FROM custom_events
     WHERE site_id = ? AND name = ? AND timestamp >= ? AND timestamp <= ? AND properties IS NOT NULL
@@ -334,7 +341,7 @@ async function loadData() {
 try {
   // A host server may pre-fetch the data (e.g. when rendering in a context that
   // can't reach the DB module) and inject it as `preloaded`; otherwise the view
-  // queries SingleStore itself.
+  // queries PostgreSQL itself.
   if (typeof preloaded !== 'undefined' && preloaded) {
     kpis = preloaded.kpis ?? kpis
     series = preloaded.series ?? []
@@ -688,7 +695,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
     @if (!live)
       <div class="mb-8 px-4 py-3 text-sm panel reveal" style="color: var(--text-2)">
         <span class="font-semibold" style="color: var(--text)">Waiting for data.</span>
-        Point <span class="mono" style="color: var(--accent)">DB_CONNECTION=singlestore</span> at a live cluster and drop the
+        Point <span class="mono" style="color: var(--accent)">DB_CONNECTION=postgres</span> at a live database and drop the
         <span class="mono" style="color: var(--accent)">/script.js</span> tracker on your site. Metrics appear here in real time.
       </div>
     @endif
@@ -975,7 +982,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
     </div>
 
     <!-- Top outbound links / file downloads: the URLs behind the auto-tracked Outbound
-        Link / File Download events (properties.url). GROUP BY properties (SingleStore-safe,
+        Link / File Download events (properties.url). GROUP BY properties (dialect-portable,
         no JSON_EXTRACT); site+range scoped like Events. Display-only; {{ }} escapes the url. -->
     <div class="grid gap-6 md:grid-cols-2 mt-6">
       <div class="p-5 panel reveal">
@@ -1056,7 +1063,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
     </div>
 
     <footer class="mt-12 text-center text-xs" style="color: var(--text-3)">
-      Privacy-first, cookieless analytics on Stacks and SingleStore. <span class="mono">ghostanalytics.org</span>
+      Privacy-first, cookieless analytics on Stacks and PostgreSQL. <span class="mono">ghostanalytics.org</span>
     </footer>
 
   </div>
