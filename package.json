@@ -69,7 +69,7 @@
   },
   "dependencies": {
     "@ts-analytics/tracking": "^0.1.7",
-    "stacks": "^0.70.76"
+    "stacks": "^0.70.77"
   },
   "devDependencies": {
     "better-dx": "^0.2.15"

@@ -681,11 +681,12 @@ export const tsCloud: TsCloudConfig = {
     // ONLY site: no docs/blog/marketing static sites (this is a single-purpose
     // analytics app, not the stacks.com monorepo the scaffold was cloned from).
     //
-    // Keyed `ghostanalytics` (not the generic `main`) so that on the shared
-    // `stacks` box (attachTo) this ships to /var/www/ghostanalytics and a
-    // `ghostanalytics-ghostanalytics` service — never colliding with the box
-    // owner's own `main` site at /var/www/main.
-    ghostanalytics: {
+    // On the shared `stacks` box (attachTo) ts-cloud namespaces every install
+    // dir by project slug — this ships to /var/www/ghostanalytics-main via the
+    // `ghostanalytics-main` service, so the generic `main` key can never
+    // collide with the box owner's own `main` site (see ts-cloud
+    // siteInstallBase).
+    main: {
       root: '.',
       path: '/',
       domain: env.APP_DOMAIN || 'ghostanalytics.org',
