@@ -220,8 +220,27 @@ async function loadData() {
   kpis = { views: Number(row?.views ?? 0), visitors: Number(row?.visitors ?? 0), sessions: Number(row?.sessions ?? 0) }
   series = (await pgq(
     `SELECT LEFT(timestamp, ${bucketLen}) AS day, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors FROM page_views WHERE ${filter} GROUP BY LEFT(timestamp, ${bucketLen}) ORDER BY day ASC`, p)) ?? []
+  // Top pages by views, each LEFT JOINed to its entry-based bounce (GA-style): of the
+  // sessions that LANDED on this page, the share that bounced. The bounce subquery reuses
+  // the entry-page window (rn=1 + whole-session COUNT(*) OVER) under sessionFilter, so it
+  // sees full session history (see the entryPages note). Pages that are never a landing
+  // page have entries=0 -> the panel shows "—" rather than a misleading 0%. Params are
+  // [...p, ...sessionP] because the outer (filter) `?`s precede the subquery (sessionFilter) ones.
   pages = (await pgq(
-    `SELECT path, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors FROM page_views WHERE ${filter} GROUP BY path ORDER BY views DESC LIMIT 8`, p)) ?? []
+    `SELECT pg.path, pg.views, pg.visitors, COALESCE(eb.entries, 0) AS entries, COALESCE(eb.bounces, 0) AS bounces
+     FROM (
+       SELECT path, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors
+       FROM page_views WHERE ${filter} GROUP BY path ORDER BY views DESC LIMIT 8
+     ) pg
+     LEFT JOIN (
+       SELECT path, COUNT(*) AS entries, SUM((pv = 1)::int) AS bounces FROM (
+         SELECT path,
+                ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY timestamp ASC, id ASC) AS rn,
+                COUNT(*)    OVER (PARTITION BY session_id) AS pv
+         FROM page_views WHERE ${sessionFilter}
+       ) w WHERE w.rn = 1 GROUP BY path
+     ) eb ON eb.path = pg.path
+     ORDER BY pg.views DESC`, [...p, ...sessionP])) ?? []
   // Entry / exit pages: the FIRST and LAST page_view of each session (the tracker
   // never updates sessions.exit_path, so derive from page_views like bounce rate).
   // ROW_NUMBER windows per session by time (id as a deterministic tiebreaker);
@@ -596,7 +615,7 @@ const exportPayload = {
   },
   series: series.map(s => ({ day: s.day, views: Number(s.views || 0), visitors: Number(s.visitors || 0) })),
   prevSeries: prevSeries.map(s => ({ day: s.day, views: Number(s.views || 0), visitors: Number(s.visitors || 0) })),
-  pages: pages.map(p => ({ path: p.path, views: Number(p.views || 0), visitors: Number(p.visitors || 0) })),
+  pages: pages.map(p => ({ path: p.path, views: Number(p.views || 0), visitors: Number(p.visitors || 0), bounce: Number(p.entries) ? Math.round((Number(p.bounces || 0) / Number(p.entries)) * 100) : null })),
   referrers: referrers.map(r => ({ source: r.source, views: Number(r.views || 0) })),
   referrerUrls: referrerUrls.map(r => ({ url: r.url, views: Number(r.views || 0), visitors: Number(r.visitors || 0) })),
   channels: channels.map(c => ({ channel: c.name, views: c.views })),
@@ -825,7 +844,10 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
           <a href="{{ addFilterUrl('path', p.path) }}" class="relative items-center justify-between -mx-1 px-1 py-2.5 text-sm ga-row">
             <div class="absolute inset-y-1 left-0 rounded" style="width: {{ Math.round((Number(p.views) / maxPage) * 100) }}%; background: var(--bar);"></div>
             <span class="relative pr-2 truncate ga-row-label mono" style="color: var(--text-2)">{{ p.path }}</span>
-            <span class="relative font-medium tabular-nums mono">{{ Number(p.views).toLocaleString() }}</span>
+            <span class="flex relative gap-3.5 items-baseline">
+              <span class="tabular-nums mono" style="color: var(--text-3)" title="Bounce rate — of sessions that landed on this page, the share that bounced">{{ Number(p.entries) ? `${Math.round((Number(p.bounces) / Number(p.entries)) * 100)}%` : '—' }}</span>
+              <span class="font-medium tabular-nums mono">{{ Number(p.views).toLocaleString() }}</span>
+            </span>
           </a>
         @empty
           <div class="py-8 text-center text-sm" style="color: var(--text-3)">No pages yet.</div>
@@ -1249,7 +1271,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       section(L, ['Date', 'Views', 'Visitors'], data.series, function (r) { return [r.day, r.views, r.visitors] })
       if (data.prevSeries && data.prevSeries.length)
         section(L, ['Prev date', 'Prev views', 'Prev visitors'], data.prevSeries, function (r) { return [r.day, r.views, r.visitors] })
-      section(L, ['Top page', 'Views', 'Visitors'], data.pages, function (r) { return [r.path, r.views, r.visitors] })
+      section(L, ['Top page', 'Views', 'Visitors', 'Bounce %'], data.pages, function (r) { return [r.path, r.views, r.visitors, r.bounce == null ? '' : r.bounce] })
       section(L, ['Top source', 'Views'], data.referrers, function (r) { return [r.source, r.views] })
       section(L, ['Channel', 'Views'], data.channels, function (r) { return [r.channel, r.views] })
       section(L, ['Referrer', 'Views', 'Visitors'], data.referrerUrls, function (r) { return [r.url, r.views, r.visitors] })
