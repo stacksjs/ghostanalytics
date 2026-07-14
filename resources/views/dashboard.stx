@@ -56,6 +56,8 @@ const FILTERS = {
   campaign: { col: 'utm_campaign', label: 'Campaign' },
   utmsource: { col: 'utm_source', label: 'UTM source' },
   utmmedium: { col: 'utm_medium', label: 'UTM medium' },
+  utmcontent: { col: 'utm_content', label: 'UTM content' },
+  utmterm: { col: 'utm_term', label: 'UTM term' },
 }
 // Channel name -> a parameterized predicate on referrer_source, matching channelOf:
 // Search/Social = IN their source set; Direct = ''/'Direct'/NULL; Referral = the rest.
@@ -166,6 +168,8 @@ let channelRows = []
 let campaigns = []
 let utmSources = []
 let utmMediums = []
+let utmContents = []
+let utmTerms = []
 let bounceRate = 0
 let avgDuration = 0
 let prevViews = 0
@@ -259,6 +263,10 @@ async function loadData() {
     `SELECT utm_source AS source, COUNT(*) AS views FROM page_views WHERE ${filter} AND utm_source IS NOT NULL AND utm_source != '' GROUP BY utm_source ORDER BY views DESC LIMIT 8`, p)) ?? []
   utmMediums = (await pgq(
     `SELECT utm_medium AS medium, COUNT(*) AS views FROM page_views WHERE ${filter} AND utm_medium IS NOT NULL AND utm_medium != '' GROUP BY utm_medium ORDER BY views DESC LIMIT 8`, p)) ?? []
+  utmContents = (await pgq(
+    `SELECT utm_content AS content, COUNT(*) AS views FROM page_views WHERE ${filter} AND utm_content IS NOT NULL AND utm_content != '' GROUP BY utm_content ORDER BY views DESC LIMIT 8`, p)) ?? []
+  utmTerms = (await pgq(
+    `SELECT utm_term AS term, COUNT(*) AS views FROM page_views WHERE ${filter} AND utm_term IS NOT NULL AND utm_term != '' GROUP BY utm_term ORDER BY views DESC LIMIT 8`, p)) ?? []
   countries = (await pgq(
     `SELECT country, COUNT(*) AS views FROM page_views WHERE ${filter} AND country IS NOT NULL AND country != '' GROUP BY country ORDER BY views DESC LIMIT 8`, p)) ?? []
   devices = (await pgq(
@@ -372,6 +380,8 @@ try {
     campaigns = preloaded.campaigns ?? []
     utmSources = preloaded.utmSources ?? []
     utmMediums = preloaded.utmMediums ?? []
+    utmContents = preloaded.utmContents ?? []
+    utmTerms = preloaded.utmTerms ?? []
     countries = preloaded.countries ?? []
     devices = preloaded.devices ?? []
     browsers = preloaded.browsers ?? []
@@ -416,6 +426,8 @@ const maxSystem = systems.reduce((m, s) => Math.max(m, Number(s.views || 0)), 0)
 const maxCampaign = campaigns.reduce((m, c) => Math.max(m, Number(c.views || 0)), 0) || 1
 const maxUtmSource = utmSources.reduce((m, s) => Math.max(m, Number(s.views || 0)), 0) || 1
 const maxUtmMedium = utmMediums.reduce((m, u) => Math.max(m, Number(u.views || 0)), 0) || 1
+const maxUtmContent = utmContents.reduce((m, u) => Math.max(m, Number(u.views || 0)), 0) || 1
+const maxUtmTerm = utmTerms.reduce((m, u) => Math.max(m, Number(u.views || 0)), 0) || 1
 // Goals: bar is scaled to the busiest goal's conversion count; rate uses the
 // range-wide distinct-visitor total (kpis.visitors), guarded against /0.
 const maxGoal = goals.reduce((m, g) => Math.max(m, Number(g.conversions || 0)), 0) || 1
@@ -595,6 +607,8 @@ const exportPayload = {
   campaigns: campaigns.map(c => ({ campaign: c.campaign, views: Number(c.views || 0) })),
   utmSources: utmSources.map(s => ({ source: s.source, views: Number(s.views || 0) })),
   utmMediums: utmMediums.map(m => ({ medium: m.medium, views: Number(m.views || 0) })),
+  utmContents: utmContents.map(c => ({ content: c.content, views: Number(c.views || 0) })),
+  utmTerms: utmTerms.map(t => ({ term: t.term, views: Number(t.views || 0) })),
   goals: goals.map(g => ({ name: g.name, conversions: Number(g.conversions || 0), converters: Number(g.converters || 0), rate: Number(goalRate(g.converters).toFixed(2)), value: Number(g.total_value || 0) })),
   events: events.map(e => ({ name: e.name, events: Number(e.events || 0), visitors: Number(e.visitors || 0) })),
   outboundLinks: outboundLinks.map(l => ({ url: l.url, clicks: Number(l.clicks || 0), visitors: Number(l.visitors || 0) })),
@@ -1090,6 +1104,34 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
           <div class="py-8 text-center text-sm" style="color: var(--text-3)">No campaign medium data yet.</div>
         @endforelse
       </div>
+
+      <!-- UTM content -->
+      <div class="p-5 panel reveal">
+        <h2 class="mb-4 font-semibold text-xs tracking-wider uppercase" style="color: var(--text-3)">Campaign content</h2>
+        @forelse (utmContents as c)
+          <a href="{{ addFilterUrl('utmcontent', c.content) }}" class="relative items-center justify-between -mx-1 px-1 py-2.5 text-sm ga-row">
+            <div class="absolute inset-y-1 left-0 rounded" style="width: {{ Math.round((Number(c.views) / maxUtmContent) * 100) }}%; background: var(--bar);"></div>
+            <span class="relative pr-2 truncate ga-row-label" style="color: var(--text-2)">{{ c.content }}</span>
+            <span class="relative font-medium tabular-nums mono">{{ Number(c.views).toLocaleString() }}</span>
+          </a>
+        @empty
+          <div class="py-8 text-center text-sm" style="color: var(--text-3)">No campaign content data yet.</div>
+        @endforelse
+      </div>
+
+      <!-- UTM terms -->
+      <div class="p-5 panel reveal">
+        <h2 class="mb-4 font-semibold text-xs tracking-wider uppercase" style="color: var(--text-3)">Campaign terms</h2>
+        @forelse (utmTerms as t)
+          <a href="{{ addFilterUrl('utmterm', t.term) }}" class="relative items-center justify-between -mx-1 px-1 py-2.5 text-sm ga-row">
+            <div class="absolute inset-y-1 left-0 rounded" style="width: {{ Math.round((Number(t.views) / maxUtmTerm) * 100) }}%; background: var(--bar);"></div>
+            <span class="relative pr-2 truncate ga-row-label" style="color: var(--text-2)">{{ t.term }}</span>
+            <span class="relative font-medium tabular-nums mono">{{ Number(t.views).toLocaleString() }}</span>
+          </a>
+        @empty
+          <div class="py-8 text-center text-sm" style="color: var(--text-3)">No campaign term data yet.</div>
+        @endforelse
+      </div>
     </div>
 
     <footer class="mt-12 text-center text-xs" style="color: var(--text-3)">
@@ -1198,6 +1240,8 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       section(L, ['Campaign', 'Views'], data.campaigns, function (r) { return [r.campaign, r.views] })
       section(L, ['UTM source', 'Views'], data.utmSources, function (r) { return [r.source, r.views] })
       section(L, ['UTM medium', 'Views'], data.utmMediums, function (r) { return [r.medium, r.views] })
+      section(L, ['UTM content', 'Views'], data.utmContents, function (r) { return [r.content, r.views] })
+      section(L, ['UTM term', 'Views'], data.utmTerms, function (r) { return [r.term, r.views] })
       section(L, ['Goal', 'Conversions', 'Rate %', 'Value'], data.goals, function (r) { return [r.name, r.conversions, r.rate, r.value] })
       section(L, ['Event', 'Events', 'Visitors'], data.events, function (r) { return [r.name, r.events, r.visitors] })
       section(L, ['Outbound link', 'Clicks', 'Visitors'], data.outboundLinks, function (r) { return [r.url, r.clicks, r.visitors] })
