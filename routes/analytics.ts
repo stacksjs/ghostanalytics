@@ -379,6 +379,21 @@ route.post('/api/sites/{siteId}/goals', async (request: any) => {
   .middleware('auth')
   .skipCsrf()
 
+route.options('/api/sites/{siteId}/goals/{goalId}', () => new Response(null, { status: 204, headers: CORS }))
+
+route.delete('/api/sites/{siteId}/goals/{goalId}', async (request: any) => {
+  const siteId = request.params.siteId
+  const goalId = request.params.goalId
+  // Delete the goal's conversions first — conversions.goal_id FKs to goals.id, so
+  // dropping the goal while conversions reference it would fail the constraint.
+  await pgq(`DELETE FROM conversions WHERE site_id = ? AND goal_id = ?`, [String(siteId), String(goalId)]).catch(() => {})
+  await pgq(`DELETE FROM goals WHERE site_id = ? AND id = ?`, [String(siteId), String(goalId)])
+  return json({ ok: true })
+})
+  // Same auth posture as create (bearer token; per-site ownership check is a follow-up).
+  .middleware('auth')
+  .skipCsrf()
+
 route.get('/api/sites/{siteId}/stats', async (request: any) => {
   const siteId = request.params.siteId
   const { from, to } = window(request)

@@ -997,11 +997,31 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
             <span class="tabular-nums mono" style="color: var(--text-3)">${{ Number(g.total_value).toLocaleString() }}</span>
             <span class="tabular-nums mono" style="color: var(--text-3)">{{ Math.round(goalRate(g.converters)) || (Number(g.converters) ? '<1' : '0') }}%</span>
             <span class="font-medium tabular-nums mono">{{ Number(g.conversions).toLocaleString() }}</span>
+            <button type="button" class="relative goal-del" data-goal-id="{{ g.id }}" data-goal-name="{{ g.name }}" title="Delete goal" aria-label="Delete goal {{ g.name }}" style="line-height:1;padding:0 3px;background:none;border:0;color:var(--text-3);cursor:pointer;font-size:16px">&times;</button>
           </span>
         </div>
       @empty
         <div class="py-8 text-center text-sm" style="color: var(--text-3)">No goals yet.</div>
       @endforelse
+      <!-- Add-goal management form: POST /api/sites/{site}/goals (bearer auth); the
+           client script (bottom of page) submits it and reloads on success. Pattern is
+           the event NAME for event goals or the URL PATH for pageview goals. -->
+      <form id="goal-form" class="flex flex-wrap gap-2 items-center mt-4 pt-4" style="border-top:1px solid var(--border)">
+        <input id="goal-name" required maxlength="255" placeholder="Goal name" style="flex:1;min-width:110px;padding:6px 9px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font:500 13px/1.2 var(--sans,ui-sans-serif)">
+        <select id="goal-type" style="padding:6px 9px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font:500 13px/1.2 var(--sans,ui-sans-serif)">
+          <option value="event">Event</option>
+          <option value="pageview">Pageview</option>
+        </select>
+        <input id="goal-pattern" required maxlength="255" placeholder="Event name or /path" style="flex:1;min-width:110px;padding:6px 9px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font:500 13px/1.2 var(--sans,ui-sans-serif)">
+        <select id="goal-match" style="padding:6px 9px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font:500 13px/1.2 var(--sans,ui-sans-serif)">
+          <option value="exact">exact</option>
+          <option value="contains">contains</option>
+          <option value="starts_with">starts with</option>
+        </select>
+        <input id="goal-value" type="number" step="any" placeholder="Value" style="width:80px;padding:6px 9px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font:500 13px/1.2 var(--sans,ui-sans-serif)">
+        <button type="submit" id="goal-add" style="padding:7px 13px;border-radius:8px;border:0;background:var(--accent);color:#fff;font:600 13px/1 var(--sans,ui-sans-serif);cursor:pointer">Add goal</button>
+      </form>
+      <div id="goal-error" class="mt-2 text-xs" style="color:#ef4444;display:none"></div>
     </div>
 
     <!-- Top events: custom events (ghost('Name', props) → custom_events) for the
@@ -1259,6 +1279,66 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       document.body.removeChild(a)
       setTimeout(function () { URL.revokeObjectURL(url) }, 1000)
     })
+  }
+
+  // Goals management: create (POST) + delete (DELETE) against the goals API,
+  // bearer-authed with the same token as the guard above. On success we reload so
+  // the panel reflects the change and its conversions. Only wires up when the page
+  // resolved a site (data.site from the embedded export payload).
+  var goalSite = data && data.site ? String(data.site) : ''
+  if (goalSite) {
+    var authHead = function (withJson) {
+      var h = { Authorization: 'Bearer ' + (localStorage.getItem('token') || '') }
+      if (withJson)
+        h['Content-Type'] = 'application/json'
+      return h
+    }
+    var goalForm = document.getElementById('goal-form')
+    var goalErr = document.getElementById('goal-error')
+    if (goalForm) {
+      goalForm.addEventListener('submit', function (e) {
+        e.preventDefault()
+        if (goalErr) { goalErr.style.display = 'none'; goalErr.textContent = '' }
+        var payload = {
+          name: (document.getElementById('goal-name').value || '').trim(),
+          type: document.getElementById('goal-type').value,
+          pattern: (document.getElementById('goal-pattern').value || '').trim(),
+          match_type: document.getElementById('goal-match').value,
+          value: document.getElementById('goal-value').value,
+        }
+        var addBtn = document.getElementById('goal-add')
+        if (addBtn) addBtn.disabled = true
+        fetch('/api/sites/' + encodeURIComponent(goalSite) + '/goals', {
+          method: 'POST', headers: authHead(true), body: JSON.stringify(payload),
+        }).then(function (r) {
+          return r.json().then(function (d) { return { ok: r.ok, d: d } }, function () { return { ok: r.ok, d: {} } })
+        }).then(function (res) {
+          if (res.ok) { window.location.reload(); return }
+          if (addBtn) addBtn.disabled = false
+          if (goalErr) { goalErr.textContent = (res.d && res.d.error) || 'Could not create goal'; goalErr.style.display = 'block' }
+        }).catch(function () {
+          if (addBtn) addBtn.disabled = false
+          if (goalErr) { goalErr.textContent = 'Network error'; goalErr.style.display = 'block' }
+        })
+      })
+    }
+    var delBtns = document.querySelectorAll('.goal-del')
+    for (var gi = 0; gi < delBtns.length; gi++) {
+      delBtns[gi].addEventListener('click', function () {
+        var id = this.getAttribute('data-goal-id')
+        var gname = this.getAttribute('data-goal-name') || 'this goal'
+        if (!id || !window.confirm('Delete "' + gname + '"? Its conversions will be removed too.'))
+          return
+        var self = this
+        self.disabled = true
+        fetch('/api/sites/' + encodeURIComponent(goalSite) + '/goals/' + encodeURIComponent(id), {
+          method: 'DELETE', headers: authHead(false),
+        }).then(function (r) {
+          if (r.ok) { window.location.reload(); return }
+          self.disabled = false
+        }).catch(function () { self.disabled = false })
+      })
+    }
   }
 })()
 </script>
