@@ -13,9 +13,6 @@
       },
     },
   },
-  "patchedDependencies": {
-    "@stacksjs/router@0.70.77": "patches/@stacksjs%2Frouter@0.70.77.patch",
-  },
   "overrides": {
     "bun-query-builder": "^0.1.44",
   },
