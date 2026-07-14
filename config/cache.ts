@@ -4,17 +4,17 @@ import { env } from '@stacksjs/env'
 /**
  * **Cache Configuration**
  *
- * ghostanalytics caches on **SingleStore** rather than Redis. Following
- * Fathom's architecture (they dropped Redis entirely once SingleStore was in
- * place — it has plenty of free RAM and the app already talks to it), the cache
- * lives in the same cluster as the analytics data, so there's one fewer service
- * to run, pay for, and keep available.
+ * ghostanalytics runs on PostgreSQL (SingleStore was dropped), which has no
+ * MySQL-wire cache table driver here, so the cache defaults to in-process
+ * `memory` — one fewer service to run for a single-node dev/app. Set
+ * `CACHE_DRIVER=redis` (with the redis block below) when a shared cache across
+ * instances is needed in production.
  */
 export default {
   /**
    * The cache driver to use ('memory' | 'redis' | 'singlestore')
    */
-  driver: env.CACHE_DRIVER || 'singlestore',
+  driver: env.CACHE_DRIVER || 'memory',
 
   /**
    * Key prefix for cache namespacing
