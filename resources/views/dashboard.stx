@@ -167,10 +167,12 @@ let campaigns = []
 let utmSources = []
 let utmMediums = []
 let bounceRate = 0
+let avgDuration = 0
 let prevViews = 0
 let prevVisitors = 0
 let prevSessions = 0
 let prevBounce = 0
+let prevAvgDuration = 0
 let liveNow = 0
 let goals = []
 let events = []
@@ -270,6 +272,17 @@ async function loadData() {
   const b = (await pgq(
     `SELECT COUNT(*) AS sessions, SUM((pv = 1)::int) AS bounced FROM (SELECT session_id, COUNT(*) AS pv FROM page_views WHERE ${filter} GROUP BY session_id) t`, p))?.[0]
   bounceRate = Number(b?.sessions) ? Math.round((Number(b.bounced) / Number(b.sessions)) * 100) : 0
+  // Avg visit duration = mean over sessions of (last - first) page_view time, in seconds.
+  // The timestamp column is an ISO-8601 varchar; cast it to timestamptz so Postgres can
+  // do real time math (Fathom/Plausible-style). Single-page-view sessions contribute 0,
+  // matching how bounces count as zero-duration visits. Uses the full filter/p like the
+  // bounce KPI (session-grouped, per-pageview filters change which sessions qualify).
+  const ad = (await pgq(
+    `SELECT AVG(dur) AS avg_dur FROM (
+       SELECT EXTRACT(EPOCH FROM (MAX(timestamp::timestamptz) - MIN(timestamp::timestamptz))) AS dur
+       FROM page_views WHERE ${filter} GROUP BY session_id
+     ) t`, p))?.[0]
+  avgDuration = Math.round(Number(ad?.avg_dur ?? 0))
   // Previous period (same length, immediately before) for trend deltas. prevFrom is
   // module-scoped (hoisted so the chart can reuse it); pp/filterPrev bind it here.
   const pp = [siteId, prevFrom, from, ...filterParams]
@@ -289,6 +302,12 @@ async function loadData() {
   const pb = (await pgq(
     `SELECT COUNT(*) AS sessions, SUM((pv = 1)::int) AS bounced FROM (SELECT session_id, COUNT(*) AS pv FROM page_views WHERE ${filterPrev} GROUP BY session_id) t`, pp))?.[0]
   prevBounce = Number(pb?.sessions) ? Math.round((Number(pb.bounced) / Number(pb.sessions)) * 100) : 0
+  const pad = (await pgq(
+    `SELECT AVG(dur) AS avg_dur FROM (
+       SELECT EXTRACT(EPOCH FROM (MAX(timestamp::timestamptz) - MIN(timestamp::timestamptz))) AS dur
+       FROM page_views WHERE ${filterPrev} GROUP BY session_id
+     ) t`, pp))?.[0]
+  prevAvgDuration = Math.round(Number(pad?.avg_dur ?? 0))
   // Unique visitors in the last ~5 minutes (reuses the resolved siteId).
   const lv = (await pgq(
     `SELECT COUNT(DISTINCT visitor_id) AS current FROM page_views WHERE site_id = ? AND timestamp >= ?${filterSql}`,
@@ -358,10 +377,12 @@ try {
     browsers = preloaded.browsers ?? []
     systems = preloaded.systems ?? []
     bounceRate = preloaded.bounceRate ?? 0
+    avgDuration = preloaded.avgDuration ?? 0
     prevViews = preloaded.prevViews ?? 0
     prevVisitors = preloaded.prevVisitors ?? 0
     prevSessions = preloaded.prevSessions ?? 0
     prevBounce = preloaded.prevBounce ?? 0
+    prevAvgDuration = preloaded.prevAvgDuration ?? 0
     liveNow = preloaded.liveNow ?? 0
     goals = preloaded.goals ?? []
     events = preloaded.events ?? []
@@ -443,6 +464,13 @@ function pct(cur, prev) {
     return null
   return Math.round(((cur - prev) / prev) * 100)
 }
+// Human-readable visit duration from a seconds count: "0s", "45s", "1m 23s".
+function fmtDuration(secs) {
+  const s = Math.max(0, Math.round(Number(secs) || 0))
+  if (s < 60)
+    return `${s}s`
+  return `${Math.floor(s / 60)}m ${s % 60}s`
+}
 const curVpv = kpis.visitors ? kpis.views / kpis.visitors : 0
 const prevVpv = prevVisitors ? prevViews / prevVisitors : 0
 // Views per visit = page views / sessions ("pages per session"). Distinct from
@@ -457,6 +485,7 @@ const kpiCards = [
   { label: 'Page views', value: kpis.views.toLocaleString(), delta: pct(kpis.views, prevViews), goodUp: true },
   { label: 'Sessions', value: kpis.sessions.toLocaleString(), delta: pct(kpis.sessions, prevSessions), goodUp: true },
   { label: 'Bounce rate', value: `${bounceRate}%`, delta: pct(bounceRate, prevBounce), goodUp: false },
+  { label: 'Avg visit time', value: fmtDuration(avgDuration), delta: pct(avgDuration, prevAvgDuration), goodUp: true },
   { label: 'Views / visit', value: kpis.sessions ? curVps.toFixed(1) : '0.0', delta: pct(curVps, prevVps), goodUp: true },
   { label: 'Views / visitor', value: kpis.visitors ? curVpv.toFixed(1) : '0.0', delta: pct(curVpv, prevVpv), goodUp: true },
 ]
@@ -549,6 +578,7 @@ const exportPayload = {
     views: kpis.views,
     sessions: kpis.sessions,
     bounceRate,
+    avgVisitSeconds: avgDuration,
     viewsPerVisit: kpis.sessions ? Number(curVps.toFixed(2)) : 0,
     viewsPerVisitor: kpis.visitors ? Number(curVpv.toFixed(2)) : 0,
   },
@@ -701,7 +731,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
     @endif
 
     <!-- KPIs: hairline-separated, mono numerics, no heavy card chrome -->
-    <div class="grid grid-cols-2 lg:grid-cols-6 mb-6 lg:divide-x panel reveal" style="border-color: var(--border)">
+    <div class="grid grid-cols-2 lg:grid-cols-7 mb-6 lg:divide-x panel reveal" style="border-color: var(--border)">
       @foreach (kpiCards as kpi)
         <div class="px-5 py-5" style="border-color: var(--border)">
           <div class="mb-2 font-medium text-xs tracking-wider uppercase" style="color: var(--text-3)">{{ kpi.label }}</div>
@@ -1150,6 +1180,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       L.push(row(['Page views', data.kpis.views]))
       L.push(row(['Sessions', data.kpis.sessions]))
       L.push(row(['Bounce rate %', data.kpis.bounceRate]))
+      L.push(row(['Avg visit time (s)', data.kpis.avgVisitSeconds]))
       L.push(row(['Views per visit', data.kpis.viewsPerVisit]))
       L.push(row(['Views per visitor', data.kpis.viewsPerVisitor]))
       L.push('')
