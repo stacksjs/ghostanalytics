@@ -3,6 +3,17 @@
 // event; error/loading are signals.
 const error = state('')
 const loading = state(false)
+// Social sign-in failures come back as ?error= from the OAuth callback redirect.
+const oauthError = state('')
+
+onMount(() => {
+  try {
+    const msg = new URLSearchParams(window.location.search).get('error')
+    if (msg)
+      oauthError.set(msg)
+  }
+  catch {}
+})
 
 async function handleSubmit(e) {
   e.preventDefault()
@@ -96,7 +107,9 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       </button>
     </form>
 
-    <div id="oauth-error" class="mt-4 px-3 py-2 text-sm rounded-lg err" style="display:none"></div>
+    @if (oauthError())
+      <div class="mt-4 px-3 py-2 text-sm rounded-lg err">{{ oauthError() }}</div>
+    @endif
 
     <div class="my-5 divider">or</div>
 
@@ -117,15 +130,3 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
     </p>
   </div>
 </div>
-
-<script>
-// Surface a social sign-in failure passed back as ?error= by the OAuth callback.
-(function () {
-  try {
-    var msg = new URLSearchParams(window.location.search).get('error')
-    if (!msg) return
-    var el = document.getElementById('oauth-error')
-    if (el) { el.textContent = msg; el.style.display = 'block' }
-  } catch (e) {}
-})()
-</script>
