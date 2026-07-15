@@ -13,9 +13,16 @@ export default new Middleware({
 
     if (bearerToken) {
       log.debug(`[middleware:auth] Validating bearer token`)
-      const isValid = await Auth.validateToken(bearerToken)
-      if (!isValid)
+      // Resolve the user (not just validate) so `request.user()` /
+      // `_authenticatedUser` are populated for API-token requests too — the
+      // site-ownership checks on the management endpoints rely on it. An
+      // invalid/expired token resolves to undefined, same 401 as before.
+      const user = await Auth.getUserFromToken(bearerToken)
+      if (!user)
         throw new HttpError(401, 'Unauthorized. Invalid token.')
+
+      Auth.setUser(user)
+      ;(request as { _authenticatedUser?: unknown })._authenticatedUser = user
 
       log.debug(`[middleware:auth] Bearer token valid`)
       return
