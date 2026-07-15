@@ -192,6 +192,9 @@ let live = false
 let user = null
 let ownedSites = []
 let installSnippet = ''
+// Read gate: the dashboard only exposes a site's data to that site's authenticated
+// OWNER. Stays false (→ no queries, no data in the response) for anyone else.
+let viewGranted = false
 
 // Race all DB work against a short timeout: if PostgreSQL isn't reachable, a
 // TCP connect can hang far longer than a render should wait, so we bail to the
@@ -224,18 +227,19 @@ async function loadData() {
     )) ?? []
   }
   // Active-site resolution: a signed-in owner only ever sees one of THEIR sites
-  // (requested ?site= if owned, else their most recent). The busiest-site default
-  // is kept solely for the unauthenticated/demo path so the public shot renders.
+  // (requested ?site= if owned, else their most recent).
   const requestedSite = query.get('site')
   if (ownedSites.length) {
     const match = requestedSite && ownedSites.find(s => String(s.id) === String(requestedSite))
     siteId = match ? String(match.id) : String(ownedSites[0].id)
   }
-  else if (siteId === 'demo') {
-    const t = await pgq('SELECT site_id FROM page_views GROUP BY site_id ORDER BY COUNT(*) DESC LIMIT 1')
-    if (t?.[0]?.site_id)
-      siteId = t[0].site_id
-  }
+  // READ GATE: only the authenticated owner of the resolved site sees its data.
+  // Bail before any query runs otherwise, so the response carries zero analytics.
+  // Site ids are PUBLIC (they ride in the tracking snippet), so a client-side guard
+  // alone leaks every site's stats to any curl or any logged-in non-owner.
+  viewGranted = ownedSites.some(s => String(s.id) === String(siteId))
+  if (!viewGranted)
+    return
   const p = [siteId, from, to, ...filterParams]
   const filter = `site_id = ? AND timestamp >= ? AND timestamp <= ?${filterSql}`
   // Entry/exit-page windows must see each session's FULL pageview history, so they use
@@ -450,6 +454,8 @@ try {
     entryPages = preloaded.entryPages ?? []
     exitPages = preloaded.exitPages ?? []
     live = true
+    // A host that prefetches + injects `preloaded` has already authorized the view.
+    viewGranted = true
   }
   else {
     await Promise.race([
@@ -632,7 +638,7 @@ const chart = buildChart(densify(series, from, to), compare ? densify(prevSeries
 // Whether the signed-in user owns the site currently shown — gates the setup
 // panel + management affordances. Install snippet is built server-side; the
 // nested closing tag is escaped so it can't terminate this <script server> block.
-const ownsActive = ownedSites.some(s => String(s.id) === String(siteId))
+const ownsActive = viewGranted
 installSnippet = `<script defer\n  src="https://ghostanalytics.org/script.js"\n  data-site="${siteId}"><\/script>`
 // eslint-disable-next-line no-unused-vars
 const activeSiteId = String(siteId)
@@ -971,7 +977,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       </div>
     @endif
 
-    @if (!live)
+    @if (viewGranted && !live)
       <div class="mb-8 px-4 py-3 text-sm panel reveal" style="color: var(--text-2)">
         <span class="font-semibold" style="color: var(--text)">Waiting for data.</span>
         Point <span class="mono" style="color: var(--accent)">DB_CONNECTION=postgres</span> at a live database and drop the
@@ -995,6 +1001,11 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
         </div>
       </details>
     @endif
+
+    <!-- Everything below the header is owner-only. When the view isn't granted the
+        server ran no queries, so there's nothing to leak here — we show a gated card
+        (below, @else) instead of the panels. -->
+    @if (viewGranted)
 
     <!-- KPIs: hairline-separated, mono numerics, no heavy card chrome -->
     <div class="grid grid-cols-2 lg:grid-cols-7 mb-6 lg:divide-x panel reveal" style="border-color: var(--border)">
@@ -1410,6 +1421,24 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
         @endforelse
       </div>
     </div>
+
+    @else
+    <!-- Gated: no authenticated owner for this site. The client guard normally
+        redirects a signed-out visitor to /login before this shows; it remains for
+        a signed-in user who has no sites yet, and as the server-side wall that
+        keeps a bare curl from ever seeing another tenant's data. -->
+    <div class="mt-6 p-10 text-center panel reveal">
+      @if (user)
+        <h2 class="mb-2 font-semibold text-lg">No site to show yet</h2>
+        <p class="mb-5 text-sm" style="color: var(--text-2)">Add a site to get a tracking snippet and start seeing analytics here.</p>
+        <a href="/sites/new" class="inline-block px-4 py-2 font-semibold text-sm" style="border-radius:10px;background:var(--accent);color:#fff;text-decoration:none">Add a site</a>
+      @else
+        <h2 class="mb-2 font-semibold text-lg">Sign in to view analytics</h2>
+        <p class="mb-5 text-sm" style="color: var(--text-2)">This dashboard is private to the site owner.</p>
+        <a href="/login" class="inline-block px-4 py-2 font-semibold text-sm" style="border-radius:10px;background:var(--accent);color:#fff;text-decoration:none">Sign in</a>
+      @endif
+    </div>
+    @endif
 
     <footer class="mt-12 text-center text-xs" style="color: var(--text-3)">
       Privacy-first, cookieless analytics on Stacks and PostgreSQL. <span class="mono">ghostanalytics.org</span>
