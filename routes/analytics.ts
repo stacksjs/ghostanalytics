@@ -312,6 +312,101 @@ route.post('/collect', async (request: any) => {
 // GROUP BY aggregates, and skips the global soft-delete filter these tables
 // don't participate in. Timestamps are stored as ISO strings, whose
 // lexicographic order matches chronological order, so string range works.
+
+// ---------------------------------------------------------------------------
+// Ownership helpers (shared by the sites + goals management endpoints)
+// ---------------------------------------------------------------------------
+
+/**
+ * The authenticated user's id, as set by the `auth` middleware. It caches the
+ * resolved user on the request (`_authenticatedUser`) for both bearer and cookie
+ * auth and 401s before the handler runs when neither is present — so on an
+ * auth-guarded route this is populated. Returns a string for dialect-agnostic
+ * comparison (owner_id is compared in JS, never bound into an int column).
+ */
+function authUserId(request: any): string | null {
+  const id = request?._authenticatedUser?.id
+  return id == null ? null : String(id)
+}
+
+/**
+ * Ownership gate for the site-scoped management endpoints. Returns null when the
+ * caller owns the site, otherwise a ready-to-return error Response:
+ *   - 401 when no user is resolved (defense-in-depth; `.middleware('auth')` already guards)
+ *   - 404 when the site row doesn't exist
+ *   - 403 when the site is ownerless (self-registered via /collect — claimable
+ *     only through POST /api/sites) or owned by someone else
+ * Site ids are public (embedded in the tracking snippet), so distinguishing 404
+ * from 403 leaks nothing sensitive.
+ */
+async function requireSiteOwner(request: any, siteId: string): Promise<Response | null> {
+  const uid = authUserId(request)
+  if (!uid)
+    return json({ error: 'Unauthorized' }, 401)
+  const rows = await pgq(`SELECT owner_id FROM sites WHERE id = ? LIMIT 1`, [String(siteId)])
+  const site = rows?.[0]
+  if (!site)
+    return json({ error: 'Site not found' }, 404)
+  if (site.owner_id == null || String(site.owner_id) !== uid)
+    return json({ error: 'Forbidden' }, 403)
+  return null
+}
+
+// ---------------------------------------------------------------------------
+// Sites (management API)
+// ---------------------------------------------------------------------------
+// A logged-in user "adds a site" to get a tracking id they OWN. /collect
+// self-registers unknown ids as ownerless shadow rows (ingest-only), which stay
+// unmanageable until owned here. The id is minted server-side (random,
+// unguessable) rather than caller-supplied, so nobody can claim an already-live
+// public site-id embedded in someone else's tracking snippet.
+
+route.options('/api/sites', () => new Response(null, { status: 204, headers: CORS }))
+
+route.get('/api/sites', async (request: any) => {
+  const uid = authUserId(request)
+  if (!uid)
+    return json({ error: 'Unauthorized' }, 401)
+  const rows = await pgq(
+    `SELECT id, name, domains, timezone, is_active, created_at
+    FROM sites WHERE owner_id = ? ORDER BY created_at DESC`,
+    [Number(uid)],
+  )
+  return json({ sites: rows ?? [] })
+}).middleware('auth')
+
+route.post('/api/sites', async (request: any) => {
+  const uid = authUserId(request)
+  if (!uid)
+    return json({ error: 'Unauthorized' }, 401)
+
+  const body = request.jsonBody ?? {}
+  const name = typeof body.name === 'string' ? body.name.trim().slice(0, 255) : ''
+  const domain = typeof body.domain === 'string' ? body.domain.trim().slice(0, 255) : ''
+  if (!name)
+    return json({ error: 'name is required' }, 400)
+
+  // Unguessable, server-minted id — never trust a caller-supplied one (that would
+  // reopen the land-grab of a live public site-id).
+  const id = createHash('sha256').update(`${uid}|${name}|${randomId()}|${Date.now()}`).digest('hex').slice(0, 24)
+  const now = new Date().toISOString()
+  const domains = domain ? [domain] : []
+
+  await db.insertInto('sites').values({
+    id,
+    name,
+    domains: JSON.stringify(domains),
+    timezone: 'UTC',
+    is_active: true,
+    owner_id: Number(uid),
+    settings: '{}',
+    created_at: now,
+    updated_at: now,
+  }).execute()
+
+  return json({ site: { id, name, domains, owner_id: Number(uid) } }, 201)
+}).middleware('auth').skipCsrf()
+
 // ---------------------------------------------------------------------------
 // Goals (management API)
 // ---------------------------------------------------------------------------
@@ -323,6 +418,9 @@ route.options('/api/sites/{siteId}/goals', () => new Response(null, { status: 20
 
 route.get('/api/sites/{siteId}/goals', async (request: any) => {
   const siteId = request.params.siteId
+  const denied = await requireSiteOwner(request, siteId)
+  if (denied)
+    return denied
   const rows = await pgq(
     `SELECT id, site_id, name, type, pattern, match_type, value, is_active
     FROM goals WHERE site_id = ? ORDER BY created_at DESC`,
@@ -333,6 +431,9 @@ route.get('/api/sites/{siteId}/goals', async (request: any) => {
 
 route.post('/api/sites/{siteId}/goals', async (request: any) => {
   const siteId = request.params.siteId
+  const denied = await requireSiteOwner(request, siteId)
+  if (denied)
+    return denied
   const body = request.jsonBody ?? {}
   const name = typeof body.name === 'string' ? body.name.trim().slice(0, 255) : ''
   const type = String(body.type ?? '')
@@ -356,10 +457,8 @@ route.post('/api/sites/{siteId}/goals', async (request: any) => {
   if (Number(activeCount ?? 0) >= 50)
     return json({ error: 'active goal limit reached (50)' }, 409)
 
-  const now = new Date().toISOString()
-  // Self-register the site (goals.site_id FKs to sites.id) before the child insert.
-  await db.insertOrIgnore('sites', { id: String(siteId), created_at: now }).catch(() => {})
-
+  // The ownership guard already proved the site row exists (and is ours), so the
+  // goals.site_id FK is satisfied without a self-register here.
   const id = randomId()
   await db.insertInto('goals').values({
     id,
@@ -374,8 +473,8 @@ route.post('/api/sites/{siteId}/goals', async (request: any) => {
 
   return json({ goal: { id, site_id: String(siteId), name, type, pattern, match_type: matchType, value, is_active: true } }, 201)
 })
-  // Management endpoint: require an authenticated user (bearer token — CSRF-immune).
-  // Full per-site ownership check against sites.owner_id is a follow-up.
+  // Management endpoint: authenticated (bearer token — CSRF-immune) AND scoped to
+  // the site's owner via requireSiteOwner() in the handler.
   .middleware('auth')
   .skipCsrf()
 
@@ -384,13 +483,16 @@ route.options('/api/sites/{siteId}/goals/{goalId}', () => new Response(null, { s
 route.delete('/api/sites/{siteId}/goals/{goalId}', async (request: any) => {
   const siteId = request.params.siteId
   const goalId = request.params.goalId
+  const denied = await requireSiteOwner(request, siteId)
+  if (denied)
+    return denied
   // Delete the goal's conversions first — conversions.goal_id FKs to goals.id, so
   // dropping the goal while conversions reference it would fail the constraint.
   await pgq(`DELETE FROM conversions WHERE site_id = ? AND goal_id = ?`, [String(siteId), String(goalId)]).catch(() => {})
   await pgq(`DELETE FROM goals WHERE site_id = ? AND id = ?`, [String(siteId), String(goalId)])
   return json({ ok: true })
 })
-  // Same auth posture as create (bearer token; per-site ownership check is a follow-up).
+  // Same posture as create: authenticated + owner-scoped (requireSiteOwner).
   .middleware('auth')
   .skipCsrf()
 
