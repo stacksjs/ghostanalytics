@@ -1,0 +1,126 @@
+<script client>
+// Add-site screen (reactive, mirrors bughq's projects/new). Creates an owned site
+// via POST /api/sites (bearer from localStorage), then drops into that site's
+// dashboard, where the server-rendered setup panel shows the install snippet.
+// error/loading are signals; the name/domain inputs are uncontrolled (read at submit).
+const error = state('')
+const loading = state(false)
+
+function ensureAuthed() {
+  const t = localStorage.getItem('token')
+  if (!t) {
+    window.location.replace('/login')
+    return
+  }
+  // Mirror the token into a cookie so the server-rendered dashboard can
+  // authenticate this user on plain navigation (owner-scoped switcher + snippet).
+  if (!/(^|;)\s*ghost_token=/.test(document.cookie))
+    document.cookie = `ghost_token=${t}; path=/; max-age=2592000; samesite=lax`
+}
+ensureAuthed()
+
+async function handleSubmit(e) {
+  e.preventDefault()
+  if (loading())
+    return
+  const form = e.target
+  const name = form.elements.name.value.trim()
+  if (!name) {
+    error.set('Give your site a name.')
+    return
+  }
+  loading.set(true)
+  error.set('')
+  try {
+    const res = await fetch('/api/sites', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      },
+      body: JSON.stringify({ name, domain: form.elements.domain.value.trim() }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (res.status === 401) {
+      window.location.replace('/login')
+      return
+    }
+    if (!res.ok || !data.site || !data.site.id) {
+      error.set(data.error || 'Could not create the site.')
+      loading.set(false)
+      return
+    }
+    // Straight into the new site's dashboard (which shows the install snippet).
+    window.location.assign(`/dashboard?site=${encodeURIComponent(data.site.id)}`)
+  }
+  catch {
+    error.set('Something went wrong. Please try again.')
+    loading.set(false)
+  }
+}
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+
+<style>
+:root {
+  --bg: #fbfbfc; --panel: #ffffff; --border: rgba(15,23,42,0.08);
+  --text: #0b1220; --text-2: #4b5563; --text-3: #98a2b3; --accent: #059669;
+  --sans: 'Geist', ui-sans-serif, system-ui, sans-serif; --mono: 'Geist Mono', ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #080b12; --panel: #0f131c; --border: rgba(148,163,184,0.12);
+    --text: #f2f5f9; --text-2: #b0b9c8; --text-3: #667085; --accent: #34d399; }
+}
+:root[data-theme="dark"] { --bg: #080b12; --panel: #0f131c; --border: rgba(148,163,184,0.12);
+  --text: #f2f5f9; --text-2: #b0b9c8; --text-3: #667085; --accent: #34d399; }
+:root[data-theme="light"] { --bg: #fbfbfc; --panel: #ffffff; --border: rgba(15,23,42,0.08);
+  --text: #0b1220; --text-2: #4b5563; --text-3: #98a2b3; --accent: #059669; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+.wordmark { font-weight: 700; letter-spacing: -0.03em; }
+.field { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; color: var(--text); }
+.field:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent); }
+.btn { background: var(--accent); color: #fff; border-radius: 10px; transition: transform 0.12s ease, opacity 0.15s ease; }
+.btn:hover { background: color-mix(in srgb, var(--accent) 88%, #000); }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: 0.6; cursor: default; }
+.err { background: color-mix(in srgb, #ef4444 12%, transparent); color: #ef4444; }
+</style>
+
+<div class="flex items-center justify-center px-5 py-12 min-h-[100dvh]">
+  <div class="max-w-md w-full">
+    <div class="mb-8 text-center">
+      <a href="/dashboard" class="text-2xl wordmark">ghostanalytics</a>
+    </div>
+
+    <div class="mb-8 text-center">
+      <h1 class="font-semibold text-xl tracking-tight">Add a site</h1>
+      <p class="mt-2 text-sm" style="color: var(--text-3)">Each site gets its own tracking id and dashboard.</p>
+    </div>
+
+    <form @submit="handleSubmit" class="space-y-4">
+      @if (error())
+        <div class="px-3 py-2 text-sm rounded-lg err">{{ error() }}</div>
+      @endif
+
+      <div>
+        <label class="block mb-1.5 font-medium text-xs" style="color: var(--text-2)">Site name</label>
+        <input name="name" type="text" required autofocus placeholder="My Blog" class="px-3.5 py-2.5 w-full text-sm field">
+      </div>
+      <div>
+        <label class="block mb-1.5 font-medium text-xs" style="color: var(--text-2)">Domain <span style="color: var(--text-3)">(optional)</span></label>
+        <input name="domain" type="text" placeholder="example.com" class="px-3.5 py-2.5 w-full text-sm field">
+      </div>
+
+      <button type="submit" :disabled="loading()" class="py-2.5 w-full font-semibold text-sm btn">
+        {{ loading() ? 'Creating…' : 'Create site' }}
+      </button>
+    </form>
+
+    <p class="mt-6 text-center text-sm" style="color: var(--text-3)">
+      <a href="/dashboard" class="font-medium" style="color: var(--accent)">← Back to dashboard</a>
+    </p>
+  </div>
+</div>

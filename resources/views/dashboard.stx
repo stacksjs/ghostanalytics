@@ -186,6 +186,13 @@ let entryPages = []
 let exitPages = []
 let live = false
 
+// Server-side auth + owner scoping (bughq pattern). The switcher and setup panel
+// are rendered from the current user's OWN sites, resolved server-side from the
+// ghost_token cookie the client bootstrap mirrors out of localStorage.
+let user = null
+let ownedSites = []
+let installSnippet = ''
+
 // Race all DB work against a short timeout: if PostgreSQL isn't reachable, a
 // TCP connect can hang far longer than a render should wait, so we bail to the
 // empty state after 5s rather than block the page.
@@ -198,10 +205,33 @@ async function loadData() {
   // appears in any SQL string here, so the blanket rewrite is safe.
   const IS_PG = ((globalThis.process && globalThis.process.env && globalThis.process.env.DB_CONNECTION) || 'postgres') === 'postgres'
   const pgq = (sql, params) => db.unsafe(IS_PG ? (() => { let i = 0; return sql.replace(/\?/g, () => `$${++i}`) })() : sql, params ?? [])
-  // With no explicit ?site=, land on the busiest site so the dashboard shows
-  // real data out of the box (multi-tenant apps would scope this to the
-  // authenticated user's sites instead).
-  if (siteId === 'demo') {
+  // Server-authenticate from the ghost_token cookie (mirrored from localStorage by
+  // the client bootstrap at the bottom of the page), so the switcher + setup panel
+  // are scoped to the caller's OWN sites — same shape as bughq's dashboard.
+  // requestContext is guarded: it's absent in a prefetch/standalone render.
+  const authToken = (typeof requestContext !== 'undefined' && requestContext.cookie && requestContext.cookie('ghost_token')) || ''
+  if (authToken) {
+    try {
+      const { Auth } = await import('@stacksjs/auth')
+      user = await Auth.getUserFromToken(authToken)
+    }
+    catch { user = null }
+  }
+  if (user) {
+    ownedSites = (await pgq(
+      'SELECT id, name FROM sites WHERE owner_id = ? ORDER BY created_at DESC NULLS LAST, id',
+      [Number(user.id)],
+    )) ?? []
+  }
+  // Active-site resolution: a signed-in owner only ever sees one of THEIR sites
+  // (requested ?site= if owned, else their most recent). The busiest-site default
+  // is kept solely for the unauthenticated/demo path so the public shot renders.
+  const requestedSite = query.get('site')
+  if (ownedSites.length) {
+    const match = requestedSite && ownedSites.find(s => String(s.id) === String(requestedSite))
+    siteId = match ? String(match.id) : String(ownedSites[0].id)
+  }
+  else if (siteId === 'demo') {
     const t = await pgq('SELECT site_id FROM page_views GROUP BY site_id ORDER BY COUNT(*) DESC LIMIT 1')
     if (t?.[0]?.site_id)
       siteId = t[0].site_id
@@ -228,19 +258,19 @@ async function loadData() {
   // [...p, ...sessionP] because the outer (filter) `?`s precede the subquery (sessionFilter) ones.
   pages = (await pgq(
     `SELECT pg.path, pg.views, pg.visitors, COALESCE(eb.entries, 0) AS entries, COALESCE(eb.bounces, 0) AS bounces
-     FROM (
-       SELECT path, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors
-       FROM page_views WHERE ${filter} GROUP BY path ORDER BY views DESC LIMIT 8
-     ) pg
-     LEFT JOIN (
-       SELECT path, COUNT(*) AS entries, SUM((pv = 1)::int) AS bounces FROM (
-         SELECT path,
+    FROM (
+      SELECT path, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors
+      FROM page_views WHERE ${filter} GROUP BY path ORDER BY views DESC LIMIT 8
+    ) pg
+    LEFT JOIN (
+      SELECT path, COUNT(*) AS entries, SUM((pv = 1)::int) AS bounces FROM (
+        SELECT path,
                 ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY timestamp ASC, id ASC) AS rn,
                 COUNT(*)    OVER (PARTITION BY session_id) AS pv
-         FROM page_views WHERE ${sessionFilter}
-       ) w WHERE w.rn = 1 GROUP BY path
-     ) eb ON eb.path = pg.path
-     ORDER BY pg.views DESC`, [...p, ...sessionP])) ?? []
+        FROM page_views WHERE ${sessionFilter}
+      ) w WHERE w.rn = 1 GROUP BY path
+    ) eb ON eb.path = pg.path
+    ORDER BY pg.views DESC`, [...p, ...sessionP])) ?? []
   // Entry / exit pages: the FIRST and LAST page_view of each session (the tracker
   // never updates sessions.exit_path, so derive from page_views like bounce rate).
   // ROW_NUMBER windows per session by time (id as a deterministic tiebreaker);
@@ -251,11 +281,11 @@ async function loadData() {
   // page, over top-8, sums to the same bounced/sessions as the overall bounce KPI.
   entryPages = (await pgq(
     `SELECT path, COUNT(*) AS entries, COUNT(DISTINCT visitor_id) AS visitors, SUM((pv = 1)::int) AS bounces FROM (
-       SELECT path, visitor_id,
+      SELECT path, visitor_id,
               ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY timestamp ASC, id ASC) AS rn,
               COUNT(*)    OVER (PARTITION BY session_id) AS pv
-       FROM page_views WHERE ${sessionFilter}
-     ) t WHERE t.rn = 1 GROUP BY path ORDER BY entries DESC LIMIT 8`, sessionP)) ?? []
+      FROM page_views WHERE ${sessionFilter}
+    ) t WHERE t.rn = 1 GROUP BY path ORDER BY entries DESC LIMIT 8`, sessionP)) ?? []
   // NOTE: the pv window is COUNT(*) OVER (PARTITION BY session_id) with NO ORDER BY on
   // purpose — the whole-partition frame yields the session's TOTAL page views on every
   // row (so the rn=1 entry row knows if pv=1 => bounced). Adding an ORDER BY here would
@@ -263,9 +293,9 @@ async function loadData() {
   // bounce on every entry page. Do not add one.
   exitPages = (await pgq(
     `SELECT path, COUNT(*) AS exits, COUNT(DISTINCT visitor_id) AS visitors FROM (
-       SELECT path, visitor_id, ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY timestamp DESC, id DESC) AS rn
-       FROM page_views WHERE ${sessionFilter}
-     ) t WHERE t.rn = 1 GROUP BY path ORDER BY exits DESC LIMIT 8`, sessionP)) ?? []
+      SELECT path, visitor_id, ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY timestamp DESC, id DESC) AS rn
+      FROM page_views WHERE ${sessionFilter}
+    ) t WHERE t.rn = 1 GROUP BY path ORDER BY exits DESC LIMIT 8`, sessionP)) ?? []
   referrers = (await pgq(
     `SELECT referrer_source AS source, COUNT(*) AS views FROM page_views WHERE ${filter} GROUP BY referrer_source ORDER BY views DESC LIMIT 8`, p)) ?? []
   // Top referrers: the actual referring URLs (full referrer), distinct from the normalized
@@ -306,9 +336,9 @@ async function loadData() {
   // bounce KPI (session-grouped, per-pageview filters change which sessions qualify).
   const ad = (await pgq(
     `SELECT AVG(dur) AS avg_dur FROM (
-       SELECT EXTRACT(EPOCH FROM (MAX(timestamp::timestamptz) - MIN(timestamp::timestamptz))) AS dur
-       FROM page_views WHERE ${filter} GROUP BY session_id
-     ) t`, p))?.[0]
+      SELECT EXTRACT(EPOCH FROM (MAX(timestamp::timestamptz) - MIN(timestamp::timestamptz))) AS dur
+      FROM page_views WHERE ${filter} GROUP BY session_id
+    ) t`, p))?.[0]
   avgDuration = Math.round(Number(ad?.avg_dur ?? 0))
   // Previous period (same length, immediately before) for trend deltas. prevFrom is
   // module-scoped (hoisted so the chart can reuse it); pp/filterPrev bind it here.
@@ -331,9 +361,9 @@ async function loadData() {
   prevBounce = Number(pb?.sessions) ? Math.round((Number(pb.bounced) / Number(pb.sessions)) * 100) : 0
   const pad = (await pgq(
     `SELECT AVG(dur) AS avg_dur FROM (
-       SELECT EXTRACT(EPOCH FROM (MAX(timestamp::timestamptz) - MIN(timestamp::timestamptz))) AS dur
-       FROM page_views WHERE ${filterPrev} GROUP BY session_id
-     ) t`, pp))?.[0]
+      SELECT EXTRACT(EPOCH FROM (MAX(timestamp::timestamptz) - MIN(timestamp::timestamptz))) AS dur
+      FROM page_views WHERE ${filterPrev} GROUP BY session_id
+    ) t`, pp))?.[0]
   prevAvgDuration = Math.round(Number(pad?.avg_dur ?? 0))
   // Unique visitors in the last ~5 minutes (reuses the resolved siteId).
   const lv = (await pgq(
@@ -599,6 +629,12 @@ const chart = buildChart(densify(series, from, to), compare ? densify(prevSeries
 // CSV export payload. Serialize the already-loaded view (no extra query). It rides in a
 // data-export="{{ exportJson }}" attribute, so stx {{ }} attribute-escaping neutralizes any
 // "<"/quote in the JSON (the DOM decodes on read, JSON.parse restores it) — safe as-is.
+// Whether the signed-in user owns the site currently shown — gates the setup
+// panel + management affordances. Install snippet is built server-side; the
+// nested closing tag is escaped so it can't terminate this <script server> block.
+const ownsActive = ownedSites.some(s => String(s.id) === String(siteId))
+installSnippet = `<script defer\n  src="https://ghostanalytics.org/script.js"\n  data-site="${siteId}"><\/script>`
+
 const exportPayload = {
   site: siteId,
   range,
@@ -720,10 +756,26 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
         <p class="mt-2 text-sm" style="color: var(--text-3)">
           Site <span class="mono" style="color: var(--text-2)">{{ siteId }}</span> · last {{ days }} days
         </p>
-        <!-- Site switcher + "Add site": populated client-side from GET /api/sites
-             (the caller's owned sites). Hidden until the fetch resolves so it never
-             flashes empty; the plain-text line above is the no-JS fallback. -->
-        <div id="site-switcher" class="flex flex-wrap gap-2 items-center mt-3" hidden></div>
+        <!-- Site switcher (server-rendered, owner-scoped — mirrors bughq): the
+            <select> navigates by rewriting ?site=; the plain-text line above is
+            the no-JS / no-owned-sites fallback. "+ Add site" is a link to the
+            reactive create page, not an in-page modal. -->
+        @if (ownedSites.length || user)
+          <div class="flex flex-wrap gap-2 items-center mt-3">
+            @if (ownedSites.length > 1)
+              <select onchange="location.href = '?site=' + encodeURIComponent(this.value) + '&range={{ range }}'"
+                aria-label="Switch site"
+                class="px-2.5 py-1.5 text-sm mono pill" style="color: var(--text-2); border: 1px solid var(--border); background: var(--panel); cursor: pointer">
+                @foreach (ownedSites as s)
+                  <option value="{{ s.id }}" {{ String(s.id) === String(siteId) ? 'selected' : '' }}>{{ s.name || s.id }}</option>
+                @endforeach
+              </select>
+            @endif
+            @if (user)
+              <a href="/sites/new" class="px-3 py-1.5 font-medium text-xs border pill" style="color: var(--text-2); border-color: var(--border)">+ Add site</a>
+            @endif
+          </div>
+        @endif
         <div class="inline-flex gap-2 items-center mt-3 px-2.5 py-1 border pill reveal" style="border-color: var(--border)">
           <span class="{{ liveNow ? 'live-dot' : '' }}" style="position: relative; display: inline-block; width: 7px; height: 7px; border-radius: 999px; background: {{ liveNow ? 'var(--accent)' : 'var(--text-3)' }};"></span>
           <span class="font-semibold text-xs mono" style="color: {{ liveNow ? 'var(--text)' : 'var(--text-3)' }}">{{ liveNow }}</span>
@@ -765,6 +817,23 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
         Point <span class="mono" style="color: var(--accent)">DB_CONNECTION=postgres</span> at a live database and drop the
         <span class="mono" style="color: var(--accent)">/script.js</span> tracker on your site. Metrics appear here in real time.
       </div>
+    @endif
+
+    <!-- Setup panel: shown to the site's owner so they can grab the install
+        snippet. Open by default until the first pageview lands. Native <details>,
+        server-rendered — no client JS. {{ }} HTML-escapes the snippet so the tag
+        shows as text rather than executing. -->
+    @if (ownsActive)
+      <details class="mb-8 panel reveal" {{ Number(kpis.views) ? '' : 'open' }} style="border-color: var(--border)">
+        <summary class="flex items-center justify-between px-5 py-4" style="cursor: pointer">
+          <span class="font-semibold text-sm">Install ghostanalytics on this site</span>
+          <span class="px-2 py-0.5 text-[11px] rounded-full mono" style="border: 1px solid var(--border); color: var(--text-3)">Snippet</span>
+        </summary>
+        <div class="pb-5 px-5">
+          <p class="mb-2 text-sm" style="color: var(--text-2)">Add this tag to every page, once — inside the &lt;head&gt;:</p>
+          <pre class="px-4 py-3 text-xs mono" style="white-space: pre; overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text-2); margin: 0">{{ installSnippet }}</pre>
+        </div>
+      </details>
     @endif
 
     <!-- KPIs: hairline-separated, mono numerics, no heavy card chrome -->
@@ -1030,8 +1099,8 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
         <div class="py-8 text-center text-sm" style="color: var(--text-3)">No goals yet.</div>
       @endforelse
       <!-- Add-goal management form: POST /api/sites/{site}/goals (bearer auth); the
-           client script (bottom of page) submits it and reloads on success. Pattern is
-           the event NAME for event goals or the URL PATH for pageview goals. -->
+          client script (bottom of page) submits it and reloads on success. Pattern is
+          the event NAME for event goals or the URL PATH for pageview goals. -->
       <form id="goal-form" class="flex flex-wrap gap-2 items-center mt-4 pt-4" style="border-top:1px solid var(--border)">
         <input id="goal-name" required maxlength="255" placeholder="Goal name" style="flex:1;min-width:110px;padding:6px 9px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font:500 13px/1.2 var(--sans,ui-sans-serif)">
         <select id="goal-type" style="padding:6px 9px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font:500 13px/1.2 var(--sans,ui-sans-serif)">
@@ -1187,49 +1256,33 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
   </div>
 </div>
 
-<!-- Add-site modal: POST /api/sites (bearer auth) mints an owned tracking id. On
-    success the form is swapped for the install snippet (built client-side from the
-    current origin + returned id) so the user can copy it and go to the new site's
-    dashboard. Hidden until the switcher's "Add site" button opens it. -->
-<div id="addsite-modal" hidden style="position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,0.55)">
-  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="addsite-title" style="width:100%;max-width:460px;padding:22px;background:var(--panel);border:1px solid var(--border);border-radius:14px">
-    <div class="flex items-center justify-between mb-4">
-      <h2 id="addsite-title" class="font-semibold text-sm">Add a site</h2>
-      <button type="button" id="addsite-close" aria-label="Close" style="background:none;border:0;color:var(--text-3);font-size:20px;line-height:1;cursor:pointer">&times;</button>
-    </div>
-    <form id="addsite-form" class="flex flex-col gap-3">
-      <input id="addsite-name" required maxlength="255" placeholder="Site name (e.g. My Blog)" style="padding:9px 11px;border-radius:9px;border:1px solid var(--border);background:var(--bg);color:var(--text);font:500 14px/1.2 var(--sans,ui-sans-serif)">
-      <input id="addsite-domain" maxlength="255" placeholder="Domain (optional, e.g. example.com)" style="padding:9px 11px;border-radius:9px;border:1px solid var(--border);background:var(--bg);color:var(--text);font:500 14px/1.2 var(--sans,ui-sans-serif)">
-      <div id="addsite-error" class="text-xs" style="color:#ef4444;display:none"></div>
-      <button type="submit" id="addsite-submit" style="padding:9px 13px;border-radius:9px;border:0;background:var(--accent);color:#fff;font:600 13px/1 var(--sans,ui-sans-serif);cursor:pointer">Create site</button>
-    </form>
-    <div id="addsite-success" hidden>
-      <p class="mb-2 text-sm" style="color:var(--text-2)">Site created. Add this tag to every page, once:</p>
-      <pre id="addsite-snippet" class="mono" style="white-space:pre-wrap;word-break:break-all;padding:11px;border-radius:9px;border:1px solid var(--border);background:var(--bg);color:var(--text-2);font-size:12px;margin:0"></pre>
-      <div class="flex gap-2 items-center mt-3">
-        <button type="button" id="addsite-copy" style="padding:8px 12px;border-radius:9px;border:1px solid var(--border);background:var(--panel);color:var(--text-2);font:600 13px/1 var(--sans,ui-sans-serif);cursor:pointer">Copy</button>
-        <a id="addsite-go" href="#" style="padding:8px 12px;border-radius:9px;background:var(--accent);color:#fff;text-decoration:none;font:600 13px/1 var(--sans,ui-sans-serif)">Go to dashboard →</a>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- View data for client-side CSV export, embedded as an HTML-escaped attribute.
     {{ }} escapes it for the attribute; the DOM decodes it on read, then JSON.parse
     restores the object. Robust across stx's script-tag handling. -->
 <div id="export-data" data-export="{{ exportJson }}" hidden></div>
 
-<!-- Client auth guard: redirect to /login when there is no token, and add a
-    logout control. Plain pass-through script (stx client hydration is not
-    available on these served pages). -->
+<!-- Dashboard bootstrap (bughq pattern): token guard, mirror the localStorage
+    token into the ghost_token cookie so the <script server> block can
+    owner-scope the switcher + setup panel, then the logout/upgrade chrome, CSV
+    export, and goals management (delegated). Interactive create forms live on
+    their own reactive <script client> pages (e.g. /sites/new), not here. -->
 <script>
 (function () {
-  if (!localStorage.getItem('token')) { window.location.replace('/login'); return }
+  var t = localStorage.getItem('token')
+  if (!t) { window.location.replace('/login'); return }
+  // First load after login carries no cookie yet: set it, then reload once so the
+  // server render authenticates this user and shows their sites + setup panel.
+  if (!/(^|;)\s*ghost_token=/.test(document.cookie)) {
+    document.cookie = 'ghost_token=' + t + '; path=/; max-age=2592000; samesite=lax'
+    window.location.reload()
+    return
+  }
   const btn = document.createElement('button')
   btn.textContent = 'Log out'
   btn.style.cssText = 'position:fixed;top:16px;right:18px;font:500 13px/1 var(--sans,ui-sans-serif);padding:8px 13px;border-radius:9px;border:1px solid var(--border,rgba(148,163,184,0.2));background:var(--panel,#fff);color:var(--text-2,#555);cursor:pointer;z-index:60'
   btn.addEventListener('click', function () {
     localStorage.removeItem('token'); localStorage.removeItem('user')
+    document.cookie = 'ghost_token=; path=/; max-age=0'
     window.location.assign('/login')
   })
   const up = document.createElement('a')
@@ -1390,134 +1443,6 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
           if (r.ok) { window.location.reload(); return }
           self.disabled = false
         }).catch(function () { self.disabled = false })
-      })
-    }
-  }
-
-  // Site switcher + add-site: list the caller's OWNED sites (GET /api/sites) as a
-  // header dropdown and let them create a new owned site (POST /api/sites), which
-  // mints an unguessable tracking id and reveals the install snippet. Reuses the
-  // bearer token + `data` (export payload) resolved above.
-  var token = localStorage.getItem('token') || ''
-  var curSite = (data && data.site != null) ? String(data.site) : ''
-  var curRange = (data && data.range) ? String(data.range) : (new URLSearchParams(window.location.search).get('range') || '30d')
-  var sw = document.getElementById('site-switcher')
-  var modal = document.getElementById('addsite-modal')
-  if (sw && modal) {
-    var siteUrl = function (id) { return '?site=' + encodeURIComponent(id) + '&range=' + encodeURIComponent(curRange) }
-    var form = document.getElementById('addsite-form')
-    var errEl = document.getElementById('addsite-error')
-    var okEl = document.getElementById('addsite-success')
-    var submitBtn = document.getElementById('addsite-submit')
-    var snippetEl = document.getElementById('addsite-snippet')
-    var goEl = document.getElementById('addsite-go')
-
-    var resetModal = function () {
-      if (errEl) { errEl.style.display = 'none'; errEl.textContent = '' }
-      if (okEl) okEl.hidden = true
-      if (form) { form.hidden = false; form.reset() }
-      if (submitBtn) submitBtn.disabled = false
-    }
-    var closeModal = function () { modal.hidden = true }
-
-    // Render the switcher: a <select> of owned sites + an "Add site" button.
-    var renderSwitcher = function (sites) {
-      sw.textContent = ''
-      var owned = Array.isArray(sites) ? sites : []
-      if (owned.length) {
-        var sel = document.createElement('select')
-        sel.setAttribute('aria-label', 'Switch site')
-        sel.style.cssText = 'padding:6px 9px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text-2);font:500 13px/1.2 var(--sans,ui-sans-serif);cursor:pointer;max-width:260px'
-        var inList = false
-        owned.forEach(function (s) {
-          var o = document.createElement('option')
-          o.value = String(s.id)
-          o.textContent = (s.name ? s.name + ' — ' : '') + String(s.id)
-          if (String(s.id) === curSite) { o.selected = true; inList = true }
-          sel.appendChild(o)
-        })
-        // Viewing a site the caller doesn't own (e.g. the busiest-site default):
-        // show it as a labelled current entry so the select isn't misleading.
-        if (!inList && curSite) {
-          var o0 = document.createElement('option')
-          o0.value = curSite; o0.textContent = curSite + ' (current)'; o0.selected = true
-          sel.insertBefore(o0, sel.firstChild)
-        }
-        sel.addEventListener('change', function () { window.location.assign(siteUrl(sel.value)) })
-        sw.appendChild(sel)
-      }
-      var add = document.createElement('button')
-      add.type = 'button'
-      add.textContent = owned.length ? '+ Add site' : '+ Add your first site'
-      add.style.cssText = 'padding:6px 11px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text-2);font:600 12px/1 var(--sans,ui-sans-serif);cursor:pointer'
-      add.addEventListener('click', function () { resetModal(); modal.hidden = false })
-      sw.appendChild(add)
-      sw.hidden = false
-    }
-
-    fetch('/api/sites', { headers: { Authorization: 'Bearer ' + token } })
-      .then(function (r) { return r.ok ? r.json() : { sites: [] } })
-      .then(function (d) { renderSwitcher(d && d.sites) })
-      .catch(function () { renderSwitcher([]) })
-
-    var closeBtn = document.getElementById('addsite-close')
-    if (closeBtn) closeBtn.addEventListener('click', closeModal)
-    modal.addEventListener('click', function (e) { if (e.target === modal) closeModal() })
-
-    if (form) {
-      form.addEventListener('submit', function (e) {
-        e.preventDefault()
-        if (errEl) { errEl.style.display = 'none'; errEl.textContent = '' }
-        var payload = {
-          name: (document.getElementById('addsite-name').value || '').trim(),
-          domain: (document.getElementById('addsite-domain').value || '').trim(),
-        }
-        if (!payload.name) {
-          if (errEl) { errEl.textContent = 'Site name is required'; errEl.style.display = 'block' }
-          return
-        }
-        if (submitBtn) submitBtn.disabled = true
-        fetch('/api/sites', {
-          method: 'POST',
-          headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        }).then(function (r) {
-          return r.json().then(function (d) { return { ok: r.ok, d: d } }, function () { return { ok: r.ok, d: {} } })
-        }).then(function (res) {
-          if (res.ok && res.d && res.d.site && res.d.site.id) {
-            var id = String(res.d.site.id)
-            // Build the tag WITHOUT literal script open/close markers in source —
-            // they would close the inlined stx bundle early; split each in two.
-            var tag = '<' + 'script defer\n  src="' + window.location.origin + '/script.js"\n  data-site="' + id + '"><' + '/script>'
-            if (snippetEl) snippetEl.textContent = tag
-            if (goEl) goEl.setAttribute('href', siteUrl(id))
-            if (form) form.hidden = true
-            if (okEl) okEl.hidden = false
-          }
-          else {
-            if (submitBtn) submitBtn.disabled = false
-            if (errEl) { errEl.textContent = (res.d && res.d.error) || 'Could not create site'; errEl.style.display = 'block' }
-          }
-        }).catch(function () {
-          if (submitBtn) submitBtn.disabled = false
-          if (errEl) { errEl.textContent = 'Network error'; errEl.style.display = 'block' }
-        })
-      })
-    }
-
-    var copyBtn = document.getElementById('addsite-copy')
-    if (copyBtn) {
-      copyBtn.addEventListener('click', function () {
-        var text = snippetEl ? snippetEl.textContent : ''
-        var done = function () { copyBtn.textContent = 'Copied'; setTimeout(function () { copyBtn.textContent = 'Copy' }, 1500) }
-        if (window.navigator.clipboard && window.navigator.clipboard.writeText) {
-          window.navigator.clipboard.writeText(text).then(done, function () {})
-        }
-        else {
-          var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select()
-          try { document.execCommand('copy'); done() } catch (_) {}
-          document.body.removeChild(ta)
-        }
       })
     }
   }
