@@ -720,6 +720,10 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
         <p class="mt-2 text-sm" style="color: var(--text-3)">
           Site <span class="mono" style="color: var(--text-2)">{{ siteId }}</span> · last {{ days }} days
         </p>
+        <!-- Site switcher + "Add site": populated client-side from GET /api/sites
+             (the caller's owned sites). Hidden until the fetch resolves so it never
+             flashes empty; the plain-text line above is the no-JS fallback. -->
+        <div id="site-switcher" class="flex flex-wrap gap-2 items-center mt-3" hidden></div>
         <div class="inline-flex gap-2 items-center mt-3 px-2.5 py-1 border pill reveal" style="border-color: var(--border)">
           <span class="{{ liveNow ? 'live-dot' : '' }}" style="position: relative; display: inline-block; width: 7px; height: 7px; border-radius: 999px; background: {{ liveNow ? 'var(--accent)' : 'var(--text-3)' }};"></span>
           <span class="font-semibold text-xs mono" style="color: {{ liveNow ? 'var(--text)' : 'var(--text-3)' }}">{{ liveNow }}</span>
@@ -1183,6 +1187,33 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
   </div>
 </div>
 
+<!-- Add-site modal: POST /api/sites (bearer auth) mints an owned tracking id. On
+    success the form is swapped for the install snippet (built client-side from the
+    current origin + returned id) so the user can copy it and go to the new site's
+    dashboard. Hidden until the switcher's "Add site" button opens it. -->
+<div id="addsite-modal" hidden style="position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,0.55)">
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="addsite-title" style="width:100%;max-width:460px;padding:22px;background:var(--panel);border:1px solid var(--border);border-radius:14px">
+    <div class="flex items-center justify-between mb-4">
+      <h2 id="addsite-title" class="font-semibold text-sm">Add a site</h2>
+      <button type="button" id="addsite-close" aria-label="Close" style="background:none;border:0;color:var(--text-3);font-size:20px;line-height:1;cursor:pointer">&times;</button>
+    </div>
+    <form id="addsite-form" class="flex flex-col gap-3">
+      <input id="addsite-name" required maxlength="255" placeholder="Site name (e.g. My Blog)" style="padding:9px 11px;border-radius:9px;border:1px solid var(--border);background:var(--bg);color:var(--text);font:500 14px/1.2 var(--sans,ui-sans-serif)">
+      <input id="addsite-domain" maxlength="255" placeholder="Domain (optional, e.g. example.com)" style="padding:9px 11px;border-radius:9px;border:1px solid var(--border);background:var(--bg);color:var(--text);font:500 14px/1.2 var(--sans,ui-sans-serif)">
+      <div id="addsite-error" class="text-xs" style="color:#ef4444;display:none"></div>
+      <button type="submit" id="addsite-submit" style="padding:9px 13px;border-radius:9px;border:0;background:var(--accent);color:#fff;font:600 13px/1 var(--sans,ui-sans-serif);cursor:pointer">Create site</button>
+    </form>
+    <div id="addsite-success" hidden>
+      <p class="mb-2 text-sm" style="color:var(--text-2)">Site created. Add this tag to every page, once:</p>
+      <pre id="addsite-snippet" class="mono" style="white-space:pre-wrap;word-break:break-all;padding:11px;border-radius:9px;border:1px solid var(--border);background:var(--bg);color:var(--text-2);font-size:12px;margin:0"></pre>
+      <div class="flex gap-2 items-center mt-3">
+        <button type="button" id="addsite-copy" style="padding:8px 12px;border-radius:9px;border:1px solid var(--border);background:var(--panel);color:var(--text-2);font:600 13px/1 var(--sans,ui-sans-serif);cursor:pointer">Copy</button>
+        <a id="addsite-go" href="#" style="padding:8px 12px;border-radius:9px;background:var(--accent);color:#fff;text-decoration:none;font:600 13px/1 var(--sans,ui-sans-serif)">Go to dashboard →</a>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- View data for client-side CSV export, embedded as an HTML-escaped attribute.
     {{ }} escapes it for the attribute; the DOM decodes it on read, then JSON.parse
     restores the object. Robust across stx's script-tag handling. -->
@@ -1359,6 +1390,134 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
           if (r.ok) { window.location.reload(); return }
           self.disabled = false
         }).catch(function () { self.disabled = false })
+      })
+    }
+  }
+
+  // Site switcher + add-site: list the caller's OWNED sites (GET /api/sites) as a
+  // header dropdown and let them create a new owned site (POST /api/sites), which
+  // mints an unguessable tracking id and reveals the install snippet. Reuses the
+  // bearer token + `data` (export payload) resolved above.
+  var token = localStorage.getItem('token') || ''
+  var curSite = (data && data.site != null) ? String(data.site) : ''
+  var curRange = (data && data.range) ? String(data.range) : (new URLSearchParams(window.location.search).get('range') || '30d')
+  var sw = document.getElementById('site-switcher')
+  var modal = document.getElementById('addsite-modal')
+  if (sw && modal) {
+    var siteUrl = function (id) { return '?site=' + encodeURIComponent(id) + '&range=' + encodeURIComponent(curRange) }
+    var form = document.getElementById('addsite-form')
+    var errEl = document.getElementById('addsite-error')
+    var okEl = document.getElementById('addsite-success')
+    var submitBtn = document.getElementById('addsite-submit')
+    var snippetEl = document.getElementById('addsite-snippet')
+    var goEl = document.getElementById('addsite-go')
+
+    var resetModal = function () {
+      if (errEl) { errEl.style.display = 'none'; errEl.textContent = '' }
+      if (okEl) okEl.hidden = true
+      if (form) { form.hidden = false; form.reset() }
+      if (submitBtn) submitBtn.disabled = false
+    }
+    var closeModal = function () { modal.hidden = true }
+
+    // Render the switcher: a <select> of owned sites + an "Add site" button.
+    var renderSwitcher = function (sites) {
+      sw.textContent = ''
+      var owned = Array.isArray(sites) ? sites : []
+      if (owned.length) {
+        var sel = document.createElement('select')
+        sel.setAttribute('aria-label', 'Switch site')
+        sel.style.cssText = 'padding:6px 9px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text-2);font:500 13px/1.2 var(--sans,ui-sans-serif);cursor:pointer;max-width:260px'
+        var inList = false
+        owned.forEach(function (s) {
+          var o = document.createElement('option')
+          o.value = String(s.id)
+          o.textContent = (s.name ? s.name + ' — ' : '') + String(s.id)
+          if (String(s.id) === curSite) { o.selected = true; inList = true }
+          sel.appendChild(o)
+        })
+        // Viewing a site the caller doesn't own (e.g. the busiest-site default):
+        // show it as a labelled current entry so the select isn't misleading.
+        if (!inList && curSite) {
+          var o0 = document.createElement('option')
+          o0.value = curSite; o0.textContent = curSite + ' (current)'; o0.selected = true
+          sel.insertBefore(o0, sel.firstChild)
+        }
+        sel.addEventListener('change', function () { window.location.assign(siteUrl(sel.value)) })
+        sw.appendChild(sel)
+      }
+      var add = document.createElement('button')
+      add.type = 'button'
+      add.textContent = owned.length ? '+ Add site' : '+ Add your first site'
+      add.style.cssText = 'padding:6px 11px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text-2);font:600 12px/1 var(--sans,ui-sans-serif);cursor:pointer'
+      add.addEventListener('click', function () { resetModal(); modal.hidden = false })
+      sw.appendChild(add)
+      sw.hidden = false
+    }
+
+    fetch('/api/sites', { headers: { Authorization: 'Bearer ' + token } })
+      .then(function (r) { return r.ok ? r.json() : { sites: [] } })
+      .then(function (d) { renderSwitcher(d && d.sites) })
+      .catch(function () { renderSwitcher([]) })
+
+    var closeBtn = document.getElementById('addsite-close')
+    if (closeBtn) closeBtn.addEventListener('click', closeModal)
+    modal.addEventListener('click', function (e) { if (e.target === modal) closeModal() })
+
+    if (form) {
+      form.addEventListener('submit', function (e) {
+        e.preventDefault()
+        if (errEl) { errEl.style.display = 'none'; errEl.textContent = '' }
+        var payload = {
+          name: (document.getElementById('addsite-name').value || '').trim(),
+          domain: (document.getElementById('addsite-domain').value || '').trim(),
+        }
+        if (!payload.name) {
+          if (errEl) { errEl.textContent = 'Site name is required'; errEl.style.display = 'block' }
+          return
+        }
+        if (submitBtn) submitBtn.disabled = true
+        fetch('/api/sites', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }).then(function (r) {
+          return r.json().then(function (d) { return { ok: r.ok, d: d } }, function () { return { ok: r.ok, d: {} } })
+        }).then(function (res) {
+          if (res.ok && res.d && res.d.site && res.d.site.id) {
+            var id = String(res.d.site.id)
+            // Build the tag WITHOUT literal script open/close markers in source —
+            // they would close the inlined stx bundle early; split each in two.
+            var tag = '<' + 'script defer\n  src="' + window.location.origin + '/script.js"\n  data-site="' + id + '"><' + '/script>'
+            if (snippetEl) snippetEl.textContent = tag
+            if (goEl) goEl.setAttribute('href', siteUrl(id))
+            if (form) form.hidden = true
+            if (okEl) okEl.hidden = false
+          }
+          else {
+            if (submitBtn) submitBtn.disabled = false
+            if (errEl) { errEl.textContent = (res.d && res.d.error) || 'Could not create site'; errEl.style.display = 'block' }
+          }
+        }).catch(function () {
+          if (submitBtn) submitBtn.disabled = false
+          if (errEl) { errEl.textContent = 'Network error'; errEl.style.display = 'block' }
+        })
+      })
+    }
+
+    var copyBtn = document.getElementById('addsite-copy')
+    if (copyBtn) {
+      copyBtn.addEventListener('click', function () {
+        var text = snippetEl ? snippetEl.textContent : ''
+        var done = function () { copyBtn.textContent = 'Copied'; setTimeout(function () { copyBtn.textContent = 'Copy' }, 1500) }
+        if (window.navigator.clipboard && window.navigator.clipboard.writeText) {
+          window.navigator.clipboard.writeText(text).then(done, function () {})
+        }
+        else {
+          var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select()
+          try { document.execCommand('copy'); done() } catch (_) {}
+          document.body.removeChild(ta)
+        }
       })
     }
   }
