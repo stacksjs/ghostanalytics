@@ -634,6 +634,8 @@ const chart = buildChart(densify(series, from, to), compare ? densify(prevSeries
 // nested closing tag is escaped so it can't terminate this <script server> block.
 const ownsActive = ownedSites.some(s => String(s.id) === String(siteId))
 installSnippet = `<script defer\n  src="https://ghostanalytics.org/script.js"\n  data-site="${siteId}"><\/script>`
+// eslint-disable-next-line no-unused-vars
+const activeSiteId = String(siteId)
 
 const exportPayload = {
   site: siteId,
@@ -671,7 +673,155 @@ const exportPayload = {
   entryPages: entryPages.map(e => ({ path: e.path, entries: Number(e.entries || 0), visitors: Number(e.visitors || 0), bounces: Number(e.bounces || 0), bounce: Number(e.entries) ? Math.round((Number(e.bounces || 0) / Number(e.entries)) * 100) : 0 })),
   exitPages: exitPages.map(e => ({ path: e.path, exits: Number(e.exits || 0), visitors: Number(e.visitors || 0) })),
 }
-const exportJson = JSON.stringify(exportPayload)
+</script>
+
+<script client>
+// Dashboard interactivity via stx directives (goals management, CSV export,
+// account chrome) — no imperative DOM wiring. `exportPayload` and `activeSiteId`
+// are server-scope consts; stx's server->client data bridge inlines them here as
+// literals, so there are no DOM data-reads either. Signals drive the reactive
+// bits (goal error text, Pro badge); handlers are bound with @submit / @click.
+const goalError = state('')
+const goalBusy = state(false)
+const isPro = state(false)
+
+function authHeaders(json) {
+  const h = { Authorization: `Bearer ${localStorage.getItem('token') || ''}` }
+  if (json)
+    h['Content-Type'] = 'application/json'
+  return h
+}
+
+function logout() {
+  localStorage.removeItem('token')
+  localStorage.removeItem('user')
+  document.cookie = 'ghost_token=; path=/; max-age=0'
+  window.location.assign('/login')
+}
+
+async function addGoal(e) {
+  e.preventDefault()
+  if (goalBusy())
+    return
+  goalError.set('')
+  goalBusy.set(true)
+  const form = e.target
+  const payload = {
+    name: form.elements.name.value.trim(),
+    type: form.elements.type.value,
+    pattern: form.elements.pattern.value.trim(),
+    match_type: form.elements.match.value,
+    value: form.elements.value.value,
+  }
+  try {
+    const res = await fetch(`/api/sites/${encodeURIComponent(activeSiteId)}/goals`, {
+      method: 'POST', headers: authHeaders(true), body: JSON.stringify(payload),
+    })
+    if (res.ok) {
+      window.location.reload()
+      return
+    }
+    const d = await res.json().catch(() => ({}))
+    goalError.set(d.error || 'Could not create goal')
+    goalBusy.set(false)
+  }
+  catch {
+    goalError.set('Network error')
+    goalBusy.set(false)
+  }
+}
+
+async function deleteGoal(id) {
+  if (!id || !window.confirm('Delete this goal? Its conversions will be removed too.'))
+    return
+  try {
+    const res = await fetch(`/api/sites/${encodeURIComponent(activeSiteId)}/goals/${encodeURIComponent(id)}`, {
+      method: 'DELETE', headers: authHeaders(false),
+    })
+    if (res.ok)
+      window.location.reload()
+  }
+  catch { /* leave the row; a retry click re-attempts */ }
+}
+
+// Read the server-bridged export payload and download a multi-section CSV — no
+// server round-trip. The transient <a> is the standard blob-download idiom (there
+// is no directive for "save a file"); it isn't UI construction.
+function exportCsv() {
+  const data = exportPayload
+  const cell = (v) => {
+    let s = v == null ? '' : String(v)
+    // Formula-guard: a leading = + - @ (or tab/CR) is run as a formula by
+    // Excel/Sheets; paths/referrers are visitor-controlled (CWE-1236).
+    if (/^[=+\-@\t\r]/.test(s))
+      s = `'${s}`
+    if (s.indexOf('"') < 0 && s.indexOf(',') < 0 && s.indexOf('\n') < 0 && s.indexOf('\r') < 0)
+      return s
+    return `"${s.split('"').join('""')}"`
+  }
+  const row = (cells) => cells.map(cell).join(',')
+  const L = []
+  const section = (header, items, pick) => {
+    L.push(row(header));
+    (items || []).forEach(it => L.push(row(pick(it))))
+    L.push('')
+  }
+  L.push(row(['ghostanalytics export']))
+  L.push(row(['Site', data.site]))
+  L.push(row(['Range', data.range]))
+  L.push(row(['Generated', data.generatedAt]))
+  L.push('')
+  L.push(row(['Metric', 'Value']))
+  L.push(row(['Unique visitors', data.kpis.visitors]))
+  L.push(row(['Page views', data.kpis.views]))
+  L.push(row(['Sessions', data.kpis.sessions]))
+  L.push(row(['Bounce rate %', data.kpis.bounceRate]))
+  L.push(row(['Avg visit time (s)', data.kpis.avgVisitSeconds]))
+  L.push(row(['Views per visit', data.kpis.viewsPerVisit]))
+  L.push(row(['Views per visitor', data.kpis.viewsPerVisitor]))
+  L.push('')
+  section(['Date', 'Views', 'Visitors'], data.series, r => [r.day, r.views, r.visitors])
+  if (data.prevSeries && data.prevSeries.length)
+    section(['Prev date', 'Prev views', 'Prev visitors'], data.prevSeries, r => [r.day, r.views, r.visitors])
+  section(['Top page', 'Views', 'Visitors', 'Bounce %'], data.pages, r => [r.path, r.views, r.visitors, r.bounce == null ? '' : r.bounce])
+  section(['Top source', 'Views'], data.referrers, r => [r.source, r.views])
+  section(['Channel', 'Views'], data.channels, r => [r.channel, r.views])
+  section(['Referrer', 'Views', 'Visitors'], data.referrerUrls, r => [r.url, r.views, r.visitors])
+  section(['Country', 'Views'], data.countries, r => [r.country, r.views])
+  section(['Device', 'Views'], data.devices, r => [r.device, r.views])
+  section(['Browser', 'Views'], data.browsers, r => [r.browser, r.views])
+  section(['Operating system', 'Views'], data.systems, r => [r.os, r.views])
+  section(['Campaign', 'Views'], data.campaigns, r => [r.campaign, r.views])
+  section(['UTM source', 'Views'], data.utmSources, r => [r.source, r.views])
+  section(['UTM medium', 'Views'], data.utmMediums, r => [r.medium, r.views])
+  section(['UTM content', 'Views'], data.utmContents, r => [r.content, r.views])
+  section(['UTM term', 'Views'], data.utmTerms, r => [r.term, r.views])
+  section(['Goal', 'Conversions', 'Rate %', 'Value'], data.goals, r => [r.name, r.conversions, r.rate, r.value])
+  section(['Event', 'Events', 'Visitors'], data.events, r => [r.name, r.events, r.visitors])
+  section(['Outbound link', 'Clicks', 'Visitors'], data.outboundLinks, r => [r.url, r.clicks, r.visitors])
+  section(['File download', 'Downloads', 'Visitors'], data.fileDownloads, r => [r.url, r.clicks, r.visitors])
+  section(['Entry page', 'Entries', 'Visitors', 'Bounce %'], data.entryPages, r => [r.path, r.entries, r.visitors, r.bounce])
+  section(['Exit page', 'Exits', 'Visitors'], data.exitPages, r => [r.path, r.exits, r.visitors])
+  const csv = `﻿${L.join('\r\n')}`
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `ghostanalytics-${data.site}-${data.range}.csv`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+// Reflect the plan: /api/me reports Pro from the local subscriptions table (kept
+// in sync by the Stripe webhook). The header swaps Upgrade -> Pro reactively.
+onMount(() => {
+  fetch('/api/me', { headers: authHeaders(false) })
+    .then(r => r.ok ? r.json() : null)
+    .then(d => { if (d && d.pro) isPro.set(true) })
+    .catch(() => {})
+})
 </script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -748,6 +898,16 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
 </style>
 
 <div class="px-5 py-10 md:px-10 min-h-[100dvh]">
+  <!-- Account chrome (fixed top-right). Upgrade -> Pro swaps reactively via the
+      isPro signal (set in onMount from /api/me). @click handlers, no DOM wiring. -->
+  <div style="position:fixed;top:16px;right:18px;z-index:60;display:flex;gap:8px;align-items:center">
+    @if (isPro())
+      <span style="font:600 13px/1 var(--sans,ui-sans-serif);padding:8px 13px;border-radius:9px;background:transparent;color:var(--accent);border:1px solid var(--accent)">Pro</span>
+    @else
+      <a href="/pricing" style="font:600 13px/1 var(--sans,ui-sans-serif);padding:8px 13px;border-radius:9px;background:var(--accent);color:#fff;text-decoration:none">Upgrade</a>
+    @endif
+    <button type="button" @click="logout" style="font:500 13px/1 var(--sans,ui-sans-serif);padding:8px 13px;border-radius:9px;border:1px solid var(--border);background:var(--panel);color:var(--text-2);cursor:pointer">Log out</button>
+  </div>
   <div class="mx-auto max-w-6xl">
 
     <header class="flex flex-wrap gap-5 items-end justify-between mb-9">
@@ -791,7 +951,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
         <a href="{{ compareToggleUrl() }}" title="Overlay the previous period on the chart"
           class="px-3.5 py-1.5 font-medium text-sm border pill"
           style="{{ compare ? 'color: #fff; background: var(--accent); border-color: var(--accent)' : 'color: var(--text-2); border-color: var(--border)' }}">Compare</a>
-        <button type="button" id="export-csv"
+        <button type="button" @click="exportCsv"
           class="px-3.5 py-1.5 font-medium text-sm border pill"
           style="color: var(--text-2); border-color: var(--border); background: var(--panel); cursor: pointer;">Export CSV</button>
       </nav>
@@ -1092,7 +1252,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
             <span class="tabular-nums mono" style="color: var(--text-3)">${{ Number(g.total_value).toLocaleString() }}</span>
             <span class="tabular-nums mono" style="color: var(--text-3)">{{ Math.round(goalRate(g.converters)) || (Number(g.converters) ? '<1' : '0') }}%</span>
             <span class="font-medium tabular-nums mono">{{ Number(g.conversions).toLocaleString() }}</span>
-            <button type="button" class="relative goal-del" data-goal-id="{{ g.id }}" data-goal-name="{{ g.name }}" title="Delete goal" aria-label="Delete goal {{ g.name }}" style="line-height:1;padding:0 3px;background:none;border:0;color:var(--text-3);cursor:pointer;font-size:16px">&times;</button>
+            <button type="button" @click="deleteGoal('{{ g.id }}')" class="relative" title="Delete goal" aria-label="Delete goal {{ g.name }}" style="line-height:1;padding:0 3px;background:none;border:0;color:var(--text-3);cursor:pointer;font-size:16px">&times;</button>
           </span>
         </div>
       @empty
@@ -1101,22 +1261,24 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       <!-- Add-goal management form: POST /api/sites/{site}/goals (bearer auth); the
           client script (bottom of page) submits it and reloads on success. Pattern is
           the event NAME for event goals or the URL PATH for pageview goals. -->
-      <form id="goal-form" class="flex flex-wrap gap-2 items-center mt-4 pt-4" style="border-top:1px solid var(--border)">
-        <input id="goal-name" required maxlength="255" placeholder="Goal name" style="flex:1;min-width:110px;padding:6px 9px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font:500 13px/1.2 var(--sans,ui-sans-serif)">
-        <select id="goal-type" style="padding:6px 9px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font:500 13px/1.2 var(--sans,ui-sans-serif)">
+      <form @submit="addGoal" class="flex flex-wrap gap-2 items-center mt-4 pt-4" style="border-top:1px solid var(--border)">
+        <input name="name" required maxlength="255" placeholder="Goal name" style="flex:1;min-width:110px;padding:6px 9px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font:500 13px/1.2 var(--sans,ui-sans-serif)">
+        <select name="type" style="padding:6px 9px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font:500 13px/1.2 var(--sans,ui-sans-serif)">
           <option value="event">Event</option>
           <option value="pageview">Pageview</option>
         </select>
-        <input id="goal-pattern" required maxlength="255" placeholder="Event name or /path" style="flex:1;min-width:110px;padding:6px 9px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font:500 13px/1.2 var(--sans,ui-sans-serif)">
-        <select id="goal-match" style="padding:6px 9px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font:500 13px/1.2 var(--sans,ui-sans-serif)">
+        <input name="pattern" required maxlength="255" placeholder="Event name or /path" style="flex:1;min-width:110px;padding:6px 9px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font:500 13px/1.2 var(--sans,ui-sans-serif)">
+        <select name="match" style="padding:6px 9px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font:500 13px/1.2 var(--sans,ui-sans-serif)">
           <option value="exact">exact</option>
           <option value="contains">contains</option>
           <option value="starts_with">starts with</option>
         </select>
-        <input id="goal-value" type="number" step="any" placeholder="Value" style="width:80px;padding:6px 9px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font:500 13px/1.2 var(--sans,ui-sans-serif)">
-        <button type="submit" id="goal-add" style="padding:7px 13px;border-radius:8px;border:0;background:var(--accent);color:#fff;font:600 13px/1 var(--sans,ui-sans-serif);cursor:pointer">Add goal</button>
+        <input name="value" type="number" step="any" placeholder="Value" style="width:80px;padding:6px 9px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font:500 13px/1.2 var(--sans,ui-sans-serif)">
+        <button type="submit" :disabled="goalBusy()" style="padding:7px 13px;border-radius:8px;border:0;background:var(--accent);color:#fff;font:600 13px/1 var(--sans,ui-sans-serif);cursor:pointer">{{ goalBusy() ? 'Adding…' : 'Add goal' }}</button>
       </form>
-      <div id="goal-error" class="mt-2 text-xs" style="color:#ef4444;display:none"></div>
+      @if (goalError())
+        <div class="mt-2 text-xs" style="color:#ef4444">{{ goalError() }}</div>
+      @endif
     </div>
 
     <!-- Top events: custom events (ghost('Name', props) → custom_events) for the
@@ -1256,195 +1418,18 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
   </div>
 </div>
 
-<!-- View data for client-side CSV export, embedded as an HTML-escaped attribute.
-    {{ }} escapes it for the attribute; the DOM decodes it on read, then JSON.parse
-    restores the object. Robust across stx's script-tag handling. -->
-<div id="export-data" data-export="{{ exportJson }}" hidden></div>
-
-<!-- Dashboard bootstrap (bughq pattern): token guard, mirror the localStorage
-    token into the ghost_token cookie so the <script server> block can
-    owner-scope the switcher + setup panel, then the logout/upgrade chrome, CSV
-    export, and goals management (delegated). Interactive create forms live on
-    their own reactive <script client> pages (e.g. /sites/new), not here. -->
+<!-- Pre-render bootstrap: token guard + mirror the localStorage token into the
+    ghost_token cookie (so the <script server> block can owner-scope the switcher
+    + setup panel), reloading once on first login. Pure navigation/cookie — no DOM
+    manipulation; all interactivity is stx directives via the <script client> above. -->
 <script>
 (function () {
   var t = localStorage.getItem('token')
   if (!t) { window.location.replace('/login'); return }
-  // First load after login carries no cookie yet: set it, then reload once so the
-  // server render authenticates this user and shows their sites + setup panel.
   if (!/(^|;)\s*ghost_token=/.test(document.cookie)) {
     document.cookie = 'ghost_token=' + t + '; path=/; max-age=2592000; samesite=lax'
     window.location.reload()
-    return
-  }
-  const btn = document.createElement('button')
-  btn.textContent = 'Log out'
-  btn.style.cssText = 'position:fixed;top:16px;right:18px;font:500 13px/1 var(--sans,ui-sans-serif);padding:8px 13px;border-radius:9px;border:1px solid var(--border,rgba(148,163,184,0.2));background:var(--panel,#fff);color:var(--text-2,#555);cursor:pointer;z-index:60'
-  btn.addEventListener('click', function () {
-    localStorage.removeItem('token'); localStorage.removeItem('user')
-    document.cookie = 'ghost_token=; path=/; max-age=0'
-    window.location.assign('/login')
-  })
-  const up = document.createElement('a')
-  up.textContent = 'Upgrade'
-  up.href = '/pricing'
-  up.style.cssText = 'position:fixed;top:16px;right:112px;font:600 13px/1 var(--sans,ui-sans-serif);padding:8px 13px;border-radius:9px;background:var(--accent);color:#fff;text-decoration:none;z-index:60'
-  document.body.appendChild(up)
-  document.body.appendChild(btn)
-
-  // Reflect the plan: when the account is Pro, swap the Upgrade CTA for a
-  // non-interactive Pro badge. `/me` reports Pro from the local subscriptions
-  // table, which the Stripe webhook keeps in sync after checkout.
-  fetch('/api/me', { headers: { Authorization: 'Bearer ' + localStorage.getItem('token') } })
-    .then(function (r) { return r.ok ? r.json() : null })
-    .then(function (d) {
-      if (d && d.pro) {
-        up.textContent = 'Pro'
-        up.removeAttribute('href')
-        up.style.background = 'transparent'
-        up.style.color = 'var(--accent)'
-        up.style.border = '1px solid var(--accent)'
-        up.style.cursor = 'default'
-      }
-    })
-    .catch(function () {})
-
-  // CSV export: read the embedded view JSON and download a multi-section CSV
-  // (no server round-trip). Runs after the token guard above, which is fine.
-  var exportEl = document.getElementById('export-data')
-  var exportBtn = document.getElementById('export-csv')
-  if (exportEl && exportBtn) {
-    var data = null
-    try { data = JSON.parse(exportEl.getAttribute('data-export')) }
-    catch (_) { data = null }
-    var cell = function (v) {
-      var s = v == null ? '' : String(v)
-      // Formula-guard: a value starting with = + - @ (or a leading tab/CR) is run
-      // as a formula by Excel/Sheets. Paths/referrers are visitor-controlled, so
-      // neutralize with a leading apostrophe before quoting (CWE-1236).
-      if (/^[=+\-@\t\r]/.test(s))
-        s = "'" + s
-      if (s.indexOf('"') < 0 && s.indexOf(',') < 0 && s.indexOf('\n') < 0 && s.indexOf('\r') < 0)
-        return s
-      return '"' + s.split('"').join('""') + '"'
-    }
-    var row = function (cells) { return cells.map(cell).join(',') }
-    var section = function (L, header, items, pick) {
-      L.push(row(header))
-      items.forEach(function (it) { L.push(row(pick(it))) })
-      L.push('')
-    }
-    exportBtn.addEventListener('click', function () {
-      if (!data)
-        return
-      var L = []
-      L.push(row(['ghostanalytics export']))
-      L.push(row(['Site', data.site]))
-      L.push(row(['Range', data.range]))
-      L.push(row(['Generated', data.generatedAt]))
-      L.push('')
-      L.push(row(['Metric', 'Value']))
-      L.push(row(['Unique visitors', data.kpis.visitors]))
-      L.push(row(['Page views', data.kpis.views]))
-      L.push(row(['Sessions', data.kpis.sessions]))
-      L.push(row(['Bounce rate %', data.kpis.bounceRate]))
-      L.push(row(['Avg visit time (s)', data.kpis.avgVisitSeconds]))
-      L.push(row(['Views per visit', data.kpis.viewsPerVisit]))
-      L.push(row(['Views per visitor', data.kpis.viewsPerVisitor]))
-      L.push('')
-      section(L, ['Date', 'Views', 'Visitors'], data.series, function (r) { return [r.day, r.views, r.visitors] })
-      if (data.prevSeries && data.prevSeries.length)
-        section(L, ['Prev date', 'Prev views', 'Prev visitors'], data.prevSeries, function (r) { return [r.day, r.views, r.visitors] })
-      section(L, ['Top page', 'Views', 'Visitors', 'Bounce %'], data.pages, function (r) { return [r.path, r.views, r.visitors, r.bounce == null ? '' : r.bounce] })
-      section(L, ['Top source', 'Views'], data.referrers, function (r) { return [r.source, r.views] })
-      section(L, ['Channel', 'Views'], data.channels, function (r) { return [r.channel, r.views] })
-      section(L, ['Referrer', 'Views', 'Visitors'], data.referrerUrls, function (r) { return [r.url, r.views, r.visitors] })
-      section(L, ['Country', 'Views'], data.countries, function (r) { return [r.country, r.views] })
-      section(L, ['Device', 'Views'], data.devices, function (r) { return [r.device, r.views] })
-      section(L, ['Browser', 'Views'], data.browsers, function (r) { return [r.browser, r.views] })
-      section(L, ['Operating system', 'Views'], data.systems, function (r) { return [r.os, r.views] })
-      section(L, ['Campaign', 'Views'], data.campaigns, function (r) { return [r.campaign, r.views] })
-      section(L, ['UTM source', 'Views'], data.utmSources, function (r) { return [r.source, r.views] })
-      section(L, ['UTM medium', 'Views'], data.utmMediums, function (r) { return [r.medium, r.views] })
-      section(L, ['UTM content', 'Views'], data.utmContents, function (r) { return [r.content, r.views] })
-      section(L, ['UTM term', 'Views'], data.utmTerms, function (r) { return [r.term, r.views] })
-      section(L, ['Goal', 'Conversions', 'Rate %', 'Value'], data.goals, function (r) { return [r.name, r.conversions, r.rate, r.value] })
-      section(L, ['Event', 'Events', 'Visitors'], data.events, function (r) { return [r.name, r.events, r.visitors] })
-      section(L, ['Outbound link', 'Clicks', 'Visitors'], data.outboundLinks, function (r) { return [r.url, r.clicks, r.visitors] })
-      section(L, ['File download', 'Downloads', 'Visitors'], data.fileDownloads, function (r) { return [r.url, r.clicks, r.visitors] })
-      section(L, ['Entry page', 'Entries', 'Visitors', 'Bounce %'], data.entryPages, function (r) { return [r.path, r.entries, r.visitors, r.bounce] })
-      section(L, ['Exit page', 'Exits', 'Visitors'], data.exitPages, function (r) { return [r.path, r.exits, r.visitors] })
-      var csv = '﻿' + L.join('\r\n')
-      var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-      var url = URL.createObjectURL(blob)
-      var a = document.createElement('a')
-      a.href = url
-      a.download = 'ghostanalytics-' + data.site + '-' + data.range + '.csv'
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      setTimeout(function () { URL.revokeObjectURL(url) }, 1000)
-    })
-  }
-
-  // Goals management: create (POST) + delete (DELETE) against the goals API,
-  // bearer-authed with the same token as the guard above. On success we reload so
-  // the panel reflects the change and its conversions. Only wires up when the page
-  // resolved a site (data.site from the embedded export payload).
-  var goalSite = data && data.site ? String(data.site) : ''
-  if (goalSite) {
-    var authHead = function (withJson) {
-      var h = { Authorization: 'Bearer ' + (localStorage.getItem('token') || '') }
-      if (withJson)
-        h['Content-Type'] = 'application/json'
-      return h
-    }
-    var goalForm = document.getElementById('goal-form')
-    var goalErr = document.getElementById('goal-error')
-    if (goalForm) {
-      goalForm.addEventListener('submit', function (e) {
-        e.preventDefault()
-        if (goalErr) { goalErr.style.display = 'none'; goalErr.textContent = '' }
-        var payload = {
-          name: (document.getElementById('goal-name').value || '').trim(),
-          type: document.getElementById('goal-type').value,
-          pattern: (document.getElementById('goal-pattern').value || '').trim(),
-          match_type: document.getElementById('goal-match').value,
-          value: document.getElementById('goal-value').value,
-        }
-        var addBtn = document.getElementById('goal-add')
-        if (addBtn) addBtn.disabled = true
-        fetch('/api/sites/' + encodeURIComponent(goalSite) + '/goals', {
-          method: 'POST', headers: authHead(true), body: JSON.stringify(payload),
-        }).then(function (r) {
-          return r.json().then(function (d) { return { ok: r.ok, d: d } }, function () { return { ok: r.ok, d: {} } })
-        }).then(function (res) {
-          if (res.ok) { window.location.reload(); return }
-          if (addBtn) addBtn.disabled = false
-          if (goalErr) { goalErr.textContent = (res.d && res.d.error) || 'Could not create goal'; goalErr.style.display = 'block' }
-        }).catch(function () {
-          if (addBtn) addBtn.disabled = false
-          if (goalErr) { goalErr.textContent = 'Network error'; goalErr.style.display = 'block' }
-        })
-      })
-    }
-    var delBtns = document.querySelectorAll('.goal-del')
-    for (var gi = 0; gi < delBtns.length; gi++) {
-      delBtns[gi].addEventListener('click', function () {
-        var id = this.getAttribute('data-goal-id')
-        var gname = this.getAttribute('data-goal-name') || 'this goal'
-        if (!id || !window.confirm('Delete "' + gname + '"? Its conversions will be removed too.'))
-          return
-        var self = this
-        self.disabled = true
-        fetch('/api/sites/' + encodeURIComponent(goalSite) + '/goals/' + encodeURIComponent(id), {
-          method: 'DELETE', headers: authHead(false),
-        }).then(function (r) {
-          if (r.ok) { window.location.reload(); return }
-          self.disabled = false
-        }).catch(function () { self.disabled = false })
-      })
-    }
   }
 })()
 </script>
+
