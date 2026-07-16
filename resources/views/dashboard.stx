@@ -193,8 +193,14 @@ let user = null
 let ownedSites = []
 let installSnippet = ''
 // Read gate: the dashboard only exposes a site's data to that site's authenticated
-// OWNER. Stays false (→ no queries, no data in the response) for anyone else.
+// OWNER, OR to anyone holding a valid ?share= token. Stays false (→ no queries, no
+// data in the response) for anyone else.
 let viewGranted = false
+// Share mode = viewing via a valid ?share= token (read-only; no management UI).
+let shareMode = false
+// The owner's existing share token for the active site ('' if none), so the owner
+// UI can show/copy/revoke the link. Bridged into the client block.
+let shareToken = ''
 
 // Race all DB work against a short timeout: if PostgreSQL isn't reachable, a
 // TCP connect can hang far longer than a render should wait, so we bail to the
@@ -226,20 +232,48 @@ async function loadData() {
       [Number(user.id)],
     )) ?? []
   }
-  // Active-site resolution: a signed-in owner only ever sees one of THEIR sites
-  // (requested ?site= if owned, else their most recent).
-  const requestedSite = query.get('site')
-  if (ownedSites.length) {
-    const match = requestedSite && ownedSites.find(s => String(s.id) === String(requestedSite))
-    siteId = match ? String(match.id) : String(ownedSites[0].id)
+  // Tolerant read of a site's settings JSON (holds the share token).
+  const readSettings = async (id) => {
+    try {
+      const r = await pgq(`SELECT settings FROM sites WHERE id = ?`, [String(id)])
+      return JSON.parse(r?.[0]?.settings || '{}') || {}
+    }
+    catch {
+      return {}
+    }
   }
-  // READ GATE: only the authenticated owner of the resolved site sees its data.
-  // Bail before any query runs otherwise, so the response carries zero analytics.
-  // Site ids are PUBLIC (they ride in the tracking snippet), so a client-side guard
-  // alone leaks every site's stats to any curl or any logged-in non-owner.
-  viewGranted = ownedSites.some(s => String(s.id) === String(siteId))
+
+  // Active-site resolution + READ GATE. Precedence:
+  //   1. caller OWNS the requested site           → owner view of it
+  //   2. requested site + valid ?share= token     → READ-ONLY share view
+  //   3. otherwise a signed-in owner              → their most-recent site
+  //   4. none of the above                        → gated (bail, run no queries)
+  // Site ids are PUBLIC (they ride in the tracking snippet), so without this
+  // server-side gate any curl / logged-in non-owner could read every site's stats.
+  const requestedSite = query.get('site')
+  const shareParam = query.get('share')
+  const ownedMatch = requestedSite && ownedSites.find(s => String(s.id) === String(requestedSite))
+  if (ownedMatch) {
+    siteId = String(ownedMatch.id)
+    viewGranted = true
+  }
+  else if (requestedSite && shareParam) {
+    const st = (await readSettings(requestedSite)).share_token
+    if (st && String(st) === String(shareParam)) {
+      siteId = String(requestedSite)
+      viewGranted = true
+      shareMode = true
+    }
+  }
+  if (!viewGranted && ownedSites.length) {
+    siteId = String(ownedSites[0].id)
+    viewGranted = true
+  }
   if (!viewGranted)
     return
+  // Owner (not a share viewer): surface any existing share token for the link UI.
+  if (!shareMode)
+    shareToken = (await readSettings(siteId)).share_token || ''
   const p = [siteId, from, to, ...filterParams]
   const filter = `site_id = ? AND timestamp >= ? AND timestamp <= ?${filterSql}`
   // Entry/exit-page windows must see each session's FULL pageview history, so they use
@@ -635,10 +669,11 @@ const chart = buildChart(densify(series, from, to), compare ? densify(prevSeries
 // CSV export payload. Serialize the already-loaded view (no extra query). It rides in a
 // data-export="{{ exportJson }}" attribute, so stx {{ }} attribute-escaping neutralizes any
 // "<"/quote in the JSON (the DOM decodes on read, JSON.parse restores it) — safe as-is.
-// Whether the signed-in user owns the site currently shown — gates the setup
-// panel + management affordances. Install snippet is built server-side; the
-// nested closing tag is escaped so it can't terminate this <script server> block.
-const ownsActive = viewGranted
+// Whether the signed-in user OWNS the site currently shown (not a share viewer) —
+// gates the setup panel + all management affordances. Install snippet is built
+// server-side; the nested closing tag is escaped so it can't end this block.
+const ownsActive = viewGranted && !shareMode
+const showSiteSelect = ownsActive && ownedSites.length > 1
 installSnippet = `<script defer\n  src="https://ghostanalytics.org/script.js"\n  data-site="${siteId}"><\/script>`
 // eslint-disable-next-line no-unused-vars
 const activeSiteId = String(siteId)
@@ -690,6 +725,11 @@ const exportPayload = {
 const goalError = state('')
 const goalBusy = state(false)
 const isPro = state(false)
+// Share link: seeded from the server-bridged existing token (shareToken/activeSiteId
+// are server consts inlined here by the data bridge), then create/revoke live.
+const shareUrl = state(shareToken ? `${window.location.origin}/dashboard?site=${encodeURIComponent(activeSiteId)}&share=${shareToken}` : '')
+const shareBusy = state(false)
+const shareCopied = state(false)
 
 function authHeaders(json) {
   const h = { Authorization: `Bearer ${localStorage.getItem('token') || ''}` }
@@ -748,6 +788,49 @@ async function deleteGoal(id) {
       window.location.reload()
   }
   catch { /* leave the row; a retry click re-attempts */ }
+}
+
+// Share link management (owner-only UI). POST mints/rotates a token; DELETE revokes.
+function shareLinkFor(token) {
+  return `${window.location.origin}/dashboard?site=${encodeURIComponent(activeSiteId)}&share=${token}`
+}
+async function createShare() {
+  if (shareBusy())
+    return
+  shareBusy.set(true)
+  try {
+    const res = await fetch(`/api/sites/${encodeURIComponent(activeSiteId)}/share`, { method: 'POST', headers: authHeaders(false) })
+    const d = await res.json().catch(() => ({}))
+    if (res.ok && d.token)
+      shareUrl.set(shareLinkFor(d.token))
+  }
+  catch {}
+  shareBusy.set(false)
+}
+async function revokeShare() {
+  if (shareBusy() || !window.confirm('Revoke the share link? Anyone using it will lose access.'))
+    return
+  shareBusy.set(true)
+  try {
+    const res = await fetch(`/api/sites/${encodeURIComponent(activeSiteId)}/share`, { method: 'DELETE', headers: authHeaders(false) })
+    if (res.ok)
+      shareUrl.set('')
+  }
+  catch {}
+  shareBusy.set(false)
+}
+function copyShare() {
+  const text = shareUrl()
+  if (!text)
+    return
+  const done = () => {
+    shareCopied.set(true)
+    setTimeout(() => shareCopied.set(false), 1500)
+  }
+  if (window.navigator.clipboard && window.navigator.clipboard.writeText)
+    window.navigator.clipboard.writeText(text).then(done, () => {})
+  else
+    done()
 }
 
 // Read the server-bridged export payload and download a multi-section CSV — no
@@ -904,16 +987,14 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
 </style>
 
 <div class="px-5 py-10 md:px-10 min-h-[100dvh]">
-  <!-- Account chrome (fixed top-right). Upgrade -> Pro swaps reactively via the
-      isPro signal (set in onMount from /api/me). @click handlers, no DOM wiring. -->
-  <div style="position:fixed;top:16px;right:18px;z-index:60;display:flex;gap:8px;align-items:center">
-    @if (isPro())
-      <span style="font:600 13px/1 var(--sans,ui-sans-serif);padding:8px 13px;border-radius:9px;background:transparent;color:var(--accent);border:1px solid var(--accent)">Pro</span>
-    @else
-      <a href="/pricing" style="font:600 13px/1 var(--sans,ui-sans-serif);padding:8px 13px;border-radius:9px;background:var(--accent);color:#fff;text-decoration:none">Upgrade</a>
-    @endif
-    <button type="button" @click="logout" style="font:500 13px/1 var(--sans,ui-sans-serif);padding:8px 13px;border-radius:9px;border:1px solid var(--border);background:var(--panel);color:var(--text-2);cursor:pointer">Log out</button>
-  </div>
+  <!-- Account chrome (fixed top-right). Owner-only (ownsActive) — a read-only share
+      viewer isn't signed in as the owner. Upgrade -> Pro swaps reactively (isPro). -->
+  @if (ownsActive)
+    <div style="position:fixed;top:16px;right:18px;z-index:60;display:flex;gap:8px;align-items:center">
+      <a :href="isPro() ? '#pro' : '/pricing'" :style="isPro() ? 'font:600 13px/1 var(--sans,ui-sans-serif);padding:8px 13px;border-radius:9px;background:transparent;color:var(--accent);border:1px solid var(--accent);text-decoration:none' : 'font:600 13px/1 var(--sans,ui-sans-serif);padding:8px 13px;border-radius:9px;background:var(--accent);color:#fff;text-decoration:none'">{{ isPro() ? 'Pro' : 'Upgrade' }}</a>
+      <button type="button" @click="logout" style="font:500 13px/1 var(--sans,ui-sans-serif);padding:8px 13px;border-radius:9px;border:1px solid var(--border);background:var(--panel);color:var(--text-2);cursor:pointer">Log out</button>
+    </div>
+  @endif
   <div class="mx-auto max-w-6xl">
 
     <header class="flex flex-wrap gap-5 items-end justify-between mb-9">
@@ -926,20 +1007,23 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
             <select> navigates by rewriting ?site=; the plain-text line above is
             the no-JS / no-owned-sites fallback. "+ Add site" is a link to the
             reactive create page, not an in-page modal. -->
-        @if (ownedSites.length || user)
-          <div class="flex flex-wrap gap-2 items-center mt-3">
-            @if (ownedSites.length > 1)
-              <select onchange="location.href = '?site=' + encodeURIComponent(this.value) + '&range={{ range }}'"
-                aria-label="Switch site"
-                class="px-2.5 py-1.5 text-sm mono pill" style="color: var(--text-2); border: 1px solid var(--border); background: var(--panel); cursor: pointer">
-                @foreach (ownedSites as s)
-                  <option value="{{ s.id }}" {{ String(s.id) === String(siteId) ? 'selected' : '' }}>{{ s.name || s.id }}</option>
-                @endforeach
-              </select>
-            @endif
-            @if (user)
-              <a href="/sites/new" class="px-3 py-1.5 font-medium text-xs border pill" style="color: var(--text-2); border-color: var(--border)">+ Add site</a>
-            @endif
+        <!-- No nested @if (stx miscounts @endif for @if nested inside a non-top-level
+            @if); the multi-site <select> is gated by a precomputed `showSiteSelect`
+            flag as its OWN block, and "+ Add site" always shows to the owner. -->
+        @if (showSiteSelect)
+          <div class="mt-3">
+            <select onchange="location.href = '?site=' + encodeURIComponent(this.value) + '&range={{ range }}'"
+              aria-label="Switch site"
+              class="px-2.5 py-1.5 text-sm mono pill" style="color: var(--text-2); border: 1px solid var(--border); background: var(--panel); cursor: pointer">
+              @foreach (ownedSites as s)
+                <option value="{{ s.id }}" {{ String(s.id) === String(siteId) ? 'selected' : '' }}>{{ s.name || s.id }}</option>
+              @endforeach
+            </select>
+          </div>
+        @endif
+        @if (ownsActive)
+          <div class="mt-3">
+            <a href="/sites/new" class="px-3 py-1.5 font-medium text-xs border pill" style="color: var(--text-2); border-color: var(--border)">+ Add site</a>
           </div>
         @endif
         <div class="inline-flex gap-2 items-center mt-3 px-2.5 py-1 border pill reveal" style="border-color: var(--border)">
@@ -1000,6 +1084,35 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
           <pre class="px-4 py-3 text-xs mono" style="white-space: pre; overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text-2); margin: 0">{{ installSnippet }}</pre>
         </div>
       </details>
+    @endif
+
+    @if (shareMode)
+      <div class="mb-6 px-4 py-3 text-sm panel reveal" style="border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); color: var(--text-2)">
+        <span class="font-semibold" style="color: var(--text)">Shared read-only view.</span>
+        You're viewing a shared dashboard — data only, no sign-in needed.
+      </div>
+    @endif
+
+    <!-- Share control (owner-only): reactive create/copy/revoke of a read-only link.
+        Signals live in the <script client> block; shareUrl is seeded from the
+        server-bridged existing token so the current link shows on load. -->
+    @if (ownsActive)
+      <div class="mb-8 p-5 panel reveal">
+        <div class="flex flex-wrap gap-3 items-center justify-between">
+          <div>
+            <div class="font-semibold text-sm">Share this dashboard</div>
+            <div class="mt-0.5 text-xs" style="color: var(--text-3)">A read-only link — anyone with it can view, but not manage, this site.</div>
+          </div>
+          <!-- No @if here (a client-signal @if nested inside a server @if breaks
+              stx's @endif matching); reactive :style toggles the two states. -->
+          <div class="flex flex-wrap gap-2 items-center" :style="shareUrl() ? 'display:flex' : 'display:none'">
+            <input readonly :value="shareUrl()" aria-label="Share link" class="text-xs mono" style="min-width:220px;max-width:340px;padding:6px 9px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text-2)">
+            <button type="button" @click="copyShare" style="padding:6px 11px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text-2);font:600 12px/1 var(--sans,ui-sans-serif);cursor:pointer">{{ shareCopied() ? 'Copied' : 'Copy' }}</button>
+            <button type="button" @click="revokeShare" :disabled="shareBusy()" style="padding:6px 11px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text-3);font:600 12px/1 var(--sans,ui-sans-serif);cursor:pointer">Revoke</button>
+          </div>
+          <button type="button" @click="createShare" :disabled="shareBusy()" :style="shareUrl() ? 'display:none' : 'display:inline-block;padding:8px 13px;border-radius:9px;border:0;background:var(--accent);color:#fff;font:600 13px/1 var(--sans,ui-sans-serif);cursor:pointer'">{{ shareBusy() ? 'Creating…' : 'Create share link' }}</button>
+        </div>
+      </div>
     @endif
 
     <!-- Everything below the header is owner-only. When the view isn't granted the
@@ -1263,15 +1376,18 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
             <span class="tabular-nums mono" style="color: var(--text-3)">${{ Number(g.total_value).toLocaleString() }}</span>
             <span class="tabular-nums mono" style="color: var(--text-3)">{{ Math.round(goalRate(g.converters)) || (Number(g.converters) ? '<1' : '0') }}%</span>
             <span class="font-medium tabular-nums mono">{{ Number(g.conversions).toLocaleString() }}</span>
-            <button type="button" @click="deleteGoal('{{ g.id }}')" class="relative" title="Delete goal" aria-label="Delete goal {{ g.name }}" style="line-height:1;padding:0 3px;background:none;border:0;color:var(--text-3);cursor:pointer;font-size:16px">&times;</button>
+            @if (ownsActive)
+              <button type="button" @click="deleteGoal('{{ g.id }}')" class="relative" title="Delete goal" aria-label="Delete goal {{ g.name }}" style="line-height:1;padding:0 3px;background:none;border:0;color:var(--text-3);cursor:pointer;font-size:16px">&times;</button>
+            @endif
           </span>
         </div>
       @empty
         <div class="py-8 text-center text-sm" style="color: var(--text-3)">No goals yet.</div>
       @endforelse
-      <!-- Add-goal management form: POST /api/sites/{site}/goals (bearer auth); the
-          client script (bottom of page) submits it and reloads on success. Pattern is
-          the event NAME for event goals or the URL PATH for pageview goals. -->
+      <!-- Add-goal management form (owner-only; hidden for share viewers): POST
+          /api/sites/{site}/goals via @submit=addGoal. Pattern is the event NAME for
+          event goals or the URL PATH for pageview goals. -->
+      @if (ownsActive)
       <form @submit="addGoal" class="flex flex-wrap gap-2 items-center mt-4 pt-4" style="border-top:1px solid var(--border)">
         <input name="name" required maxlength="255" placeholder="Goal name" style="flex:1;min-width:110px;padding:6px 9px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font:500 13px/1.2 var(--sans,ui-sans-serif)">
         <select name="type" style="padding:6px 9px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font:500 13px/1.2 var(--sans,ui-sans-serif)">
@@ -1287,8 +1403,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
         <input name="value" type="number" step="any" placeholder="Value" style="width:80px;padding:6px 9px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font:500 13px/1.2 var(--sans,ui-sans-serif)">
         <button type="submit" :disabled="goalBusy()" style="padding:7px 13px;border-radius:8px;border:0;background:var(--accent);color:#fff;font:600 13px/1 var(--sans,ui-sans-serif);cursor:pointer">{{ goalBusy() ? 'Adding…' : 'Add goal' }}</button>
       </form>
-      @if (goalError())
-        <div class="mt-2 text-xs" style="color:#ef4444">{{ goalError() }}</div>
+      <div class="mt-2 text-xs" :style="goalError() ? 'color:#ef4444' : 'display:none'">{{ goalError() }}</div>
       @endif
     </div>
 

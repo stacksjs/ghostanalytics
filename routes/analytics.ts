@@ -496,6 +496,52 @@ route.delete('/api/sites/{siteId}/goals/{goalId}', async (request: any) => {
   .middleware('auth')
   .skipCsrf()
 
+// ---------------------------------------------------------------------------
+// Shareable read-only links (management API)
+// ---------------------------------------------------------------------------
+// The owner mints a per-site share token; anyone with `?share=<token>` gets a
+// READ-ONLY dashboard for that site (the view layer hides all management). The
+// token lives in the site's existing `settings` JSON (no schema change) and is
+// revocable/rotatable. Management stays bearer-authed + owner-scoped, so a share
+// viewer can never create/delete anything.
+
+/** Read a site's settings JSON (tolerant of null/legacy non-JSON). */
+async function readSiteSettings(siteId: string): Promise<Record<string, any>> {
+  const rows = await pgq(`SELECT settings FROM sites WHERE id = ?`, [String(siteId)])
+  try {
+    return JSON.parse(rows?.[0]?.settings || '{}') || {}
+  }
+  catch {
+    return {}
+  }
+}
+
+route.options('/api/sites/{siteId}/share', () => new Response(null, { status: 204, headers: CORS }))
+
+route.post('/api/sites/{siteId}/share', async (request: any) => {
+  const siteId = request.params.siteId
+  const denied = await requireSiteOwner(request, siteId)
+  if (denied)
+    return denied
+  // Rotate on every POST: a fresh token invalidates any previously-shared link.
+  const token = createHash('sha256').update(`${siteId}|${randomId()}|share`).digest('hex').slice(0, 32)
+  const settings = await readSiteSettings(siteId)
+  settings.share_token = token
+  await pgq(`UPDATE sites SET settings = ? WHERE id = ?`, [JSON.stringify(settings), String(siteId)])
+  return json({ token, path: `/dashboard?site=${encodeURIComponent(String(siteId))}&share=${token}` })
+}).middleware('auth').skipCsrf()
+
+route.delete('/api/sites/{siteId}/share', async (request: any) => {
+  const siteId = request.params.siteId
+  const denied = await requireSiteOwner(request, siteId)
+  if (denied)
+    return denied
+  const settings = await readSiteSettings(siteId)
+  delete settings.share_token
+  await pgq(`UPDATE sites SET settings = ? WHERE id = ?`, [JSON.stringify(settings), String(siteId)])
+  return json({ ok: true })
+}).middleware('auth').skipCsrf()
+
 route.get('/api/sites/{siteId}/stats', async (request: any) => {
   const siteId = request.params.siteId
   const { from, to } = window(request)
