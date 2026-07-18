@@ -130,7 +130,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
           @else
             <div class="skeleton" style="width: 160px; height: 20px"></div>
           @endif
-          <div class="mt-1.5 text-sm" style="color: var(--text-2)">{{ email() }}</div>
+          <div class="mt-1.5 text-sm text-text-2">{{ email() }}</div>
         </div>
         @if (provider())
           <span class="ml-auto px-2.5 py-1 badge">{{ provider() }}</span>
@@ -158,14 +158,14 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       <div class="flex items-center justify-between px-6 py-4 row">
         <div>
           <div class="text-xs tracking-wide uppercase" style="color: var(--text-3); font-family: var(--mono)">Member since</div>
-          <div class="mt-1 text-base" style="color: var(--text-2)">{{ since() }}</div>
+          <div class="mt-1 text-base text-text-2">{{ since() }}</div>
         </div>
         <a href="/dashboard" class="px-4 py-2 text-sm btn btn-ghost">Open dashboard</a>
       </div>
     </section>
 
-    <p class="text-sm" style="color: var(--text-3)">
-      Signed in with a private token. <a href="/" style="color: var(--accent)">Back to site</a>
+    <p class="text-sm text-text-3">
+      Signed in with a private token. <a class="text-brand" href="/">Back to site</a>
     </p>
   </main>
 </div>

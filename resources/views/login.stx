@@ -85,7 +85,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
   <div class="max-w-sm w-full">
     <div class="mb-8 text-center">
       <a href="/" class="text-2xl wordmark">ghostanalytics</a>
-      <p class="mt-2 text-sm" style="color: var(--text-3)">Sign in to your account</p>
+      <p class="mt-2 text-sm text-text-3">Sign in to your account</p>
     </div>
 
     <form @submit="handleSubmit" class="space-y-4">
@@ -94,11 +94,11 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       @endif
 
       <div>
-        <label class="block mb-1.5 font-medium text-xs" style="color: var(--text-2)">Email</label>
+        <label class="block mb-1.5 font-medium text-xs text-text-2">Email</label>
         <input name="email" type="email" required autocomplete="email" placeholder="you@example.com" class="px-3.5 py-2.5 w-full text-sm field">
       </div>
       <div>
-        <label class="block mb-1.5 font-medium text-xs" style="color: var(--text-2)">Password</label>
+        <label class="block mb-1.5 font-medium text-xs text-text-2">Password</label>
         <input name="password" type="password" required autocomplete="current-password" placeholder="••••••••" class="px-3.5 py-2.5 w-full text-sm field">
       </div>
 
@@ -124,9 +124,9 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       </a>
     </div>
 
-    <p class="mt-6 text-center text-sm" style="color: var(--text-3)">
+    <p class="mt-6 text-center text-sm text-text-3">
       No account?
-      <a href="/register" class="font-medium" style="color: var(--accent)">Create one</a>
+      <a href="/register" class="font-medium text-brand">Create one</a>
     </p>
   </div>
 </div>

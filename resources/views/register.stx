@@ -82,7 +82,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
   <div class="max-w-sm w-full">
     <div class="mb-8 text-center">
       <a href="/" class="text-2xl wordmark">ghostanalytics</a>
-      <p class="mt-2 text-sm" style="color: var(--text-3)">Create your account</p>
+      <p class="mt-2 text-sm text-text-3">Create your account</p>
     </div>
 
     <form @submit="handleSubmit" class="space-y-4">
@@ -91,15 +91,15 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       @endif
 
       <div>
-        <label class="block mb-1.5 font-medium text-xs" style="color: var(--text-2)">Name</label>
+        <label class="block mb-1.5 font-medium text-xs text-text-2">Name</label>
         <input name="name" type="text" required autocomplete="name" placeholder="Ada Lovelace" class="px-3.5 py-2.5 w-full text-sm field">
       </div>
       <div>
-        <label class="block mb-1.5 font-medium text-xs" style="color: var(--text-2)">Email</label>
+        <label class="block mb-1.5 font-medium text-xs text-text-2">Email</label>
         <input name="email" type="email" required autocomplete="email" placeholder="you@example.com" class="px-3.5 py-2.5 w-full text-sm field">
       </div>
       <div>
-        <label class="block mb-1.5 font-medium text-xs" style="color: var(--text-2)">Password</label>
+        <label class="block mb-1.5 font-medium text-xs text-text-2">Password</label>
         <input name="password" type="password" required autocomplete="new-password" placeholder="At least 8 characters" class="px-3.5 py-2.5 w-full text-sm field">
       </div>
 
@@ -121,9 +121,9 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       </a>
     </div>
 
-    <p class="mt-6 text-center text-sm" style="color: var(--text-3)">
+    <p class="mt-6 text-center text-sm text-text-3">
       Already have an account?
-      <a href="/login" class="font-medium" style="color: var(--accent)">Sign in</a>
+      <a href="/login" class="font-medium text-brand">Sign in</a>
     </p>
   </div>
 </div>
