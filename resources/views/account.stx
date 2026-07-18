@@ -165,7 +165,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
     </section>
 
     <p class="text-sm text-text-3">
-      Signed in with a private token. <a class="text-brand" href="/">Back to site</a>
+      Signed in with a private token. <a class="text-accent" href="/">Back to site</a>
     </p>
   </main>
 </div>

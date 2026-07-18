@@ -120,7 +120,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
     </form>
 
     <p class="mt-6 text-center text-sm text-text-3">
-      <a href="/dashboard" class="font-medium text-brand">← Back to dashboard</a>
+      <a href="/dashboard" class="font-medium text-accent">← Back to dashboard</a>
     </p>
   </div>
 </div>

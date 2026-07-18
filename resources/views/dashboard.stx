@@ -1087,7 +1087,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       <div class="flex flex-wrap gap-2 items-center mb-6 reveal">
         @foreach (activeFilters as f)
           <a href="{{ removeFilterUrl(f.key) }}" class="font-medium text-xs filter-pill pill" title="Remove filter">
-            <span><span class="text-text-3">{{ f.label }}:</span> <span class="mono text-fg">{{ f.value }}</span></span>
+            <span><span class="text-text-3">{{ f.label }}:</span> <span class="mono text-text">{{ f.value }}</span></span>
             <span class="fx" aria-hidden="true">×</span>
           </a>
         @endforeach
@@ -1097,9 +1097,9 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
 
     @if (viewGranted && !live)
       <div class="mb-8 px-4 py-3 text-sm panel reveal text-text-2">
-        <span class="font-semibold text-fg">Waiting for data.</span>
-        Point <span class="mono text-brand">DB_CONNECTION=postgres</span> at a live database and drop the
-        <span class="mono text-brand">/script.js</span> tracker on your site. Metrics appear here in real time.
+        <span class="font-semibold text-text">Waiting for data.</span>
+        Point <span class="mono text-accent">DB_CONNECTION=postgres</span> at a live database and drop the
+        <span class="mono text-accent">/script.js</span> tracker on your site. Metrics appear here in real time.
       </div>
     @endif
 
@@ -1122,7 +1122,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
 
     @if (shareMode)
       <div class="mb-6 px-4 py-3 text-sm panel reveal" style="border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); color: var(--text-2)">
-        <span class="font-semibold text-fg">Shared read-only view.</span>
+        <span class="font-semibold text-text">Shared read-only view.</span>
         You're viewing a shared dashboard — data only, no sign-in needed.
       </div>
     @endif
@@ -1205,7 +1205,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
                 <span class="ga-dot ga-dot-u" style="top: {{ pt.visTopPct }}%"></span>
                 <div class="ga-tip" style="top: {{ pt.viewsTopPct }}%">
                   <div class="ga-tip-day mono">{{ pt.label }}</div>
-                  <div class="ga-tip-row"><span class="ga-sw bg-brand"></span>Views <b class="mono">{{ pt.views.toLocaleString() }}</b></div>
+                  <div class="ga-tip-row"><span class="ga-sw bg-accent"></span>Views <b class="mono">{{ pt.views.toLocaleString() }}</b></div>
                   <div class="ga-tip-row"><span class="ga-sw" style="background: var(--text-3)"></span>Visitors <b class="mono">{{ pt.visitors.toLocaleString() }}</b></div>
                   @if (pt.prevViews !== null)
                     <div class="ga-tip-row" style="opacity: 0.7"><span class="ga-sw" style="background: var(--text-3); opacity: 0.5"></span>Prev views <b class="mono">{{ pt.prevViews.toLocaleString() }}</b></div>
