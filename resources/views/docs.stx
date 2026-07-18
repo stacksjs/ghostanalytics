@@ -78,7 +78,7 @@ fetch('https://ghostanalytics.org/api/sites/demo/stats?from=2026-07-01&amp;to=20
       <section class="reveal section shell" aria-label="Own your data">
         <div class="section-head">
           <h2 class="section-title">Own your data, self-host if you want</h2>
-          <p class="section-intro">Every event lands in your own SingleStore database, so the numbers never leave your infrastructure and there is no third party to trust. The whole stack is open source.</p>
+          <p class="section-intro">Every event lands in your own PostgreSQL database, so the numbers never leave your infrastructure and there is no third party to trust. The whole stack is open source.</p>
         </div>
         <div class="hero-actions">
           <a class="btn ghost" href="https://github.com/stacksjs/ghostanalytics" data-no-router>Read the source on GitHub</a>
@@ -103,7 +103,7 @@ fetch('https://ghostanalytics.org/api/sites/demo/stats?from=2026-07-01&amp;to=20
           <span class="brand-mark">g</span>
           <span class="brand-name">ghostanalytics</span>
         </a>
-        <span>No cookies. No personal data. Powered by Stacks and SingleStore.</span>
+        <span>No cookies. No personal data. Powered by Stacks and PostgreSQL.</span>
       </div>
     </footer>
   </body>

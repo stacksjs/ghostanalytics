@@ -138,7 +138,7 @@
           <span class="brand-mark">g</span>
           <span class="brand-name">ghostanalytics</span>
         </a>
-        <span>No cookies. No personal data. Powered by Stacks and SingleStore.</span>
+        <span>No cookies. No personal data. Powered by Stacks and PostgreSQL.</span>
       </div>
     </footer>
   </body>

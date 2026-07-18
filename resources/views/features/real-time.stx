@@ -15,7 +15,7 @@ const sparkPoints = spark
 
 const flow = [
   { n: '01', h: 'A visitor loads a page', b: 'The under-2 KB first-party script fires a single beacon. No cookie is set and nothing is written to the device.' },
-  { n: '02', h: 'The event lands in your database', b: 'The pageview is written straight to your SingleStore table with a 24-hour rotating hash standing in for identity.' },
+  { n: '02', h: 'The event lands in your database', b: 'The pageview is written straight to your PostgreSQL table with a 24-hour rotating hash standing in for identity.' },
   { n: '03', h: 'The live view updates', b: 'Current visitors, active pages, and arrival sources refresh on their own, so the dashboard is right without a reload.' },
 ]
 
@@ -141,7 +141,7 @@ const related = [
           <span class="brand-mark">g</span>
           <span class="brand-name">{{ appName }}</span>
         </a>
-        <span>No cookies. No personal data. Powered by Stacks and SingleStore.</span>
+        <span>No cookies. No personal data. Powered by Stacks and PostgreSQL.</span>
       </div>
     </footer>
   </body>

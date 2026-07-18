@@ -73,7 +73,7 @@
             <img src="https://picsum.photos/seed/ghost-open-source-terminal/720/340" alt="A terminal with a self-hosting command" width="720" height="340" loading="lazy">
             <div class="usecase-body">
               <h3>Developers</h3>
-              <p>A one-line script, a one-function events API, and a clean HTTP endpoint to read it all back. Self-hostable, SingleStore-backed, and privacy-first by default. Your data stays yours.</p>
+              <p>A one-line script, a one-function events API, and a clean HTTP endpoint to read it all back. Self-hostable, PostgreSQL-backed, and privacy-first by default. Your data stays yours.</p>
               <span class="textlink">Analytics for developers</span>
             </div>
           </a>
@@ -98,7 +98,7 @@
           <span class="brand-mark">g</span>
           <span class="brand-name">ghostanalytics</span>
         </a>
-        <span>No cookies. No personal data. Powered by Stacks and SingleStore.</span>
+        <span>No cookies. No personal data. Powered by Stacks and PostgreSQL.</span>
       </div>
     </footer>
   </body>
