@@ -44,7 +44,7 @@ const privacyChips = [
 
 const comparison = [
   { dim: 'Consent', ga: 'Cookie banner and Consent Mode required', ghost: 'Cookieless. Nothing to consent to.' },
-  { dim: 'Your data', ga: 'Flows into the Google ad graph', ghost: 'Stays in your SingleStore database' },
+  { dim: 'Your data', ga: 'Flows into the Google ad graph', ghost: 'Stays in your PostgreSQL database' },
   { dim: 'Accuracy', ga: 'Sampled and thresholded reports', ghost: 'Every event counted, exact numbers' },
   { dim: 'Weight', ga: 'About 50 KB gtag.js, often blocked', ghost: 'Under 2 KB, first-party, resilient' },
   { dim: 'Leaving', ga: 'Export is a project', ghost: 'One-click GA import, both ways' },
@@ -85,12 +85,23 @@ const footerGroups = [
 ]
 </script>
 
+<script client>
+// Install-snippet framework picker (HTML / Vue / Nuxt / React / Next). The bare
+// tracker is a plain script tag for HTML/Vue/React entry HTML; Nuxt and Next
+// inject it through their own head/Script APIs.
+const framework = state('html')
+const FILE_FOR = { html: 'index.html', vue: 'index.html', react: 'index.html', nuxt: 'nuxt.config.ts', next: 'app/layout.tsx' }
+function pickFramework(e) {
+  framework.set(e.target.value)
+}
+</script>
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="ghostanalytics is privacy-first, cookieless web analytics. Real-time visitors, sources, and conversions with no cookies, no consent banner, and no personal data. Powered by Stacks and SingleStore.">
+    <meta name="description" content="ghostanalytics is privacy-first, cookieless web analytics. Real-time visitors, sources, and conversions with no cookies, no consent banner, and no personal data. Powered by Stacks and PostgreSQL.">
     <meta name="theme-color" content="#0a0c0e">
     <title>ghostanalytics - Privacy-first web analytics</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -206,16 +217,44 @@ const footerGroups = [
           </div>
           <div class="code-grid">
             <div class="code">
-              <div class="code-bar"><span>index.html</span><span>HTML</span></div>
-              <pre>&lt;!-- ghostanalytics --&gt;
+              <div class="code-bar">
+                <span>{{ FILE_FOR[framework()] }}</span>
+                <select class="code-lang" @change="pickFramework" aria-label="Choose your framework">
+                  <option value="html">HTML</option>
+                  <option value="vue">Vue</option>
+                  <option value="nuxt">Nuxt</option>
+                  <option value="react">React</option>
+                  <option value="next">Next.js</option>
+                </select>
+              </div>
+              <pre :style="framework() === 'html' ? 'display:block' : 'display:none'">&lt;!-- ghostanalytics --&gt;
 &lt;<span class="tok">script</span> defer src="https://cdn.ghostanalytics.com/script.js" data-site="YOUR_SITE_ID"&gt;&lt;/<span class="tok">script</span>&gt;</pre>
+              <pre :style="framework() === 'vue' ? 'display:block' : 'display:none'"><span class="cmt">&lt;!-- ghostanalytics · add to your index.html --&gt;</span>
+&lt;<span class="tok">script</span> defer src="https://cdn.ghostanalytics.com/script.js" data-site="YOUR_SITE_ID"&gt;&lt;/<span class="tok">script</span>&gt;</pre>
+              <pre :style="framework() === 'react' ? 'display:block' : 'display:none'"><span class="cmt">&lt;!-- ghostanalytics · add to index.html (or public/index.html) --&gt;</span>
+&lt;<span class="tok">script</span> defer src="https://cdn.ghostanalytics.com/script.js" data-site="YOUR_SITE_ID"&gt;&lt;/<span class="tok">script</span>&gt;</pre>
+              <pre :style="framework() === 'nuxt' ? 'display:block' : 'display:none'"><span class="cmt">// npm i @stacksjs/ts-analytics — official Nuxt module</span>
+<span class="tok">export default</span> defineNuxtConfig({
+  modules: [<span class="str">'@stacksjs/ts-analytics/nuxt'</span>],
+  tsAnalytics: {
+    appId: <span class="str">'YOUR_SITE_ID'</span>,
+    apiEndpoint: <span class="str">'https://cdn.ghostanalytics.com'</span>,
+  },
+})</pre>
+              <pre :style="framework() === 'next' ? 'display:block' : 'display:none'"><span class="tok">import</span> Script <span class="tok">from</span> <span class="str">'next/script'</span>
+
+&lt;Script
+  src=<span class="str">"https://cdn.ghostanalytics.com/script.js"</span>
+  data-site=<span class="str">"YOUR_SITE_ID"</span>
+  strategy=<span class="str">"afterInteractive"</span>
+/&gt;</pre>
             </div>
             <div class="code">
               <div class="code-bar"><span>anywhere in your app</span><span>JavaScript</span></div>
               <pre><span class="tok">ghost</span>('signup', { plan: 'pro' })</pre>
             </div>
           </div>
-          <p class="code-note">Track a conversion from anywhere in your app, no SDK and no init call. The script and your data live on the same host you control: beacons <code>POST</code> to <code>/collect</code> and aggregates come back from your own SingleStore database. Serve it first-party and even ad-blockers count.</p>
+          <p class="code-note">Track a conversion from anywhere in your app, no SDK and no init call. The script and your data live on the same host you control: beacons <code>POST</code> to <code>/collect</code> and aggregates come back from your own PostgreSQL database. Serve it first-party and even ad-blockers count.</p>
         </section>
 
         <section id="compare" class="reveal section shell" aria-labelledby="compare-heading">
@@ -253,7 +292,7 @@ const footerGroups = [
               <span class="brand-mark">g</span>
               <span class="brand-name">{{ appName }}</span>
             </a>
-            <p>Privacy-first web analytics, powered by Stacks + SingleStore.</p>
+            <p>Privacy-first web analytics, powered by Stacks + PostgreSQL.</p>
             <span class="footer-social">
               <a href="https://github.com/stacksjs/ghostanalytics" target="_blank" rel="noopener" aria-label="ghostanalytics on GitHub" data-no-router>
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
