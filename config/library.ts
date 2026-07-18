@@ -40,6 +40,9 @@ export default {
     description: 'Your function library description.',
     keywords: ['functions', 'composables', 'library', 'typescript', 'javascript'],
     shouldGenerateSourcemap: false,
-    files: ['counter', 'dark'],
+    // Empty: the scaffold's demo functions (counter, dark) were removed and
+    // resources/functions/ has none. Listing deleted files here made the
+    // auto-import generator emit a broken import every boot.
+    files: [],
   },
 } satisfies LibraryConfig
