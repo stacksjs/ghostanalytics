@@ -11,22 +11,27 @@ const meta = { title: 'ghostanalytics - Dashboard', description: 'Privacy-first 
 const query = new URLSearchParams((typeof globalThis !== 'undefined' && globalThis.__stxServeSearch) || '')
 let siteId = query.get('site') || 'demo'
 const range = query.get('range') || '1y'
-const days = range === '24h' ? 1 : range === '30d' ? 30 : range === '90d' ? 90 : range === '1y' ? 365 : 7
-const from = new Date(Date.now() - days * 864e5).toISOString()
+// 'all' spans from the site's earliest pageview (resolved in loadData) to now, so
+// imported/backfilled history (e.g. years of Fathom data) is visible. Fixed ranges
+// are `now - days`. These are `let` because the 'all' span — and the chart bucket
+// granularity derived from it — are only known once we query MIN(timestamp).
+const isAll = range === 'all'
+let days = range === '24h' ? 1 : range === '30d' ? 30 : range === '90d' ? 90 : range === '1y' ? 365 : range === '7d' ? 7 : 365
 const to = new Date().toISOString()
-// Chart bucket width: hourly for short spans (<= 2 days) so a 24h view shows a real
-// curve instead of one dot, else daily. bucketLen = the LEFT(timestamp, N) prefix
-// length — 'YYYY-MM-DDTHH' (13) vs 'YYYY-MM-DD' (10). String-prefix bucketing (no
-// date math) stays MySQL/dialect-portable, same as the daily chart.
-const hourly = days <= 2
-const bucketLen = hourly ? 13 : 10
+let from = isAll ? '2000-01-01T00:00:00.000Z' : new Date(Date.now() - days * 864e5).toISOString()
+// Chart bucket granularity by span: hour (<= 2d) for a real 24h curve, day (<= ~400d),
+// or month (wider, e.g. all-time) so a multi-year chart isn't thousands of points.
+// bucketLen = the LEFT(timestamp, N) prefix — 'YYYY-MM-DDTHH'(13) / 'YYYY-MM-DD'(10) /
+// 'YYYY-MM'(7). String-prefix bucketing (no date math) stays dialect-portable.
+let granularity = days <= 2 ? 'hour' : 'day'
+let hourly = granularity === 'hour'
+let bucketLen = granularity === 'hour' ? 13 : granularity === 'month' ? 7 : 10
 // Last ~5 minutes; ISO string compares lexicographically against the ISO timestamp column.
 const liveFrom = new Date(Date.now() - 5 * 60 * 1000).toISOString()
 // Compare-to-previous-period overlay: ?compare=1 draws the immediately-preceding window
-// (same length) as a faded line on the chart. prevFrom is that window's start, hoisted to
-// module scope so the chart (built below, outside loadData) can densify the prev series.
-const compare = query.get('compare') === '1'
-const prevFrom = new Date(new Date(from).getTime() - days * 864e5).toISOString()
+// (same length) as a faded line. Disabled for 'all' (no meaningful prior period).
+const compare = query.get('compare') === '1' && !isAll
+let prevFrom = new Date(new Date(from).getTime() - days * 864e5).toISOString()
 
 const ranges = [
   { key: '24h', label: '24 hours' },
@@ -34,6 +39,7 @@ const ranges = [
   { key: '30d', label: '30 days' },
   { key: '90d', label: '90 days' },
   { key: '1y', label: '1 year' },
+  { key: 'all', label: 'All' },
 ]
 
 // ---- Interactive filter engine -------------------------------------------
@@ -274,6 +280,20 @@ async function loadData() {
   // Owner (not a share viewer): surface any existing share token for the link UI.
   if (!shareMode)
     shareToken = (await readSettings(siteId)).share_token || ''
+  // 'all' range: anchor `from` at the site's earliest pageview, then pick the chart
+  // granularity from the real span (month for multi-year so imported history is
+  // legible). No data → default to last 30 days. prevFrom = from makes the prev
+  // window empty (no meaningful "previous" for all-time).
+  if (isAll) {
+    const mn = (await pgq('SELECT MIN(timestamp) AS mn FROM page_views WHERE site_id = ?', [siteId]))?.[0]?.mn
+    from = (mn && /^\d{4}-\d{2}-\d{2}/.test(String(mn))) ? String(mn) : new Date(Date.now() - 30 * 864e5).toISOString()
+    const spanDays = (Date.now() - new Date(from).getTime()) / 864e5
+    granularity = spanDays > 400 ? 'month' : (spanDays <= 2 ? 'hour' : 'day')
+    hourly = granularity === 'hour'
+    bucketLen = granularity === 'hour' ? 13 : (granularity === 'month' ? 7 : 10)
+    days = Math.max(1, Math.round(spanDays))
+    prevFrom = from
+  }
   const p = [siteId, from, to, ...filterParams]
   const filter = `site_id = ? AND timestamp >= ? AND timestamp <= ?${filterSql}`
   // Entry/exit-page windows must see each session's FULL pageview history, so they use
@@ -645,22 +665,36 @@ function buildChart(rows, prevRows) {
 // Fill every bucket in the range so the x-axis is time-proportional: buckets with
 // no traffic become 0 (a 6-month gap no longer looks like a 1-day gap), and a
 // single active bucket still draws a full-width baseline instead of an invisible
-// point. Step is hourly or daily to match the query's LEFT(timestamp, N) bucket;
+// point. Steps hour/day/month to match the query's LEFT(timestamp, N) bucket;
 // `day` holds the raw bucket key (matches the query alias + Map lookup + CSV),
-// `label` is the display form ('MM-DD HH:00' hourly, 'YYYY-MM-DD' daily).
+// `label` is the display form ('MM-DD HH:00' hourly, 'YYYY-MM-DD' daily, 'YYYY-MM' monthly).
 function densify(rows, fromISO, toISO) {
   const byKey = new Map(rows.map(r => [r.day, r]))
   const out = []
-  const step = hourly ? 3600e3 : 864e5
-  const start = hourly ? `${fromISO.slice(0, 13)}:00:00Z` : `${fromISO.slice(0, 10)}T00:00:00Z`
-  const stopAt = hourly ? `${toISO.slice(0, 13)}:00:00Z` : `${toISO.slice(0, 10)}T00:00:00Z`
-  let d = new Date(start)
-  const end = new Date(stopAt)
-  for (; d <= end; d = new Date(d.getTime() + step)) {
-    const key = d.toISOString().slice(0, hourly ? 13 : 10)
-    const label = hourly ? `${key.slice(5, 10)} ${key.slice(11, 13)}:00` : key
+  const keyLen = granularity === 'hour' ? 13 : granularity === 'month' ? 7 : 10
+  let d, end
+  if (granularity === 'month') {
+    d = new Date(`${fromISO.slice(0, 7)}-01T00:00:00Z`)
+    end = new Date(`${toISO.slice(0, 7)}-01T00:00:00Z`)
+  }
+  else if (granularity === 'hour') {
+    d = new Date(`${fromISO.slice(0, 13)}:00:00Z`)
+    end = new Date(`${toISO.slice(0, 13)}:00:00Z`)
+  }
+  else {
+    d = new Date(`${fromISO.slice(0, 10)}T00:00:00Z`)
+    end = new Date(`${toISO.slice(0, 10)}T00:00:00Z`)
+  }
+  // Bound the loop defensively (a corrupt `from` could otherwise spin); monthly
+  // over a decade is ~120 buckets, daily over a year ~365, hourly over 2d ~48.
+  for (let i = 0; d <= end && i < 5000; i++) {
+    const key = d.toISOString().slice(0, keyLen)
+    const label = granularity === 'hour' ? `${key.slice(5, 10)} ${key.slice(11, 13)}:00` : key
     const r = byKey.get(key)
     out.push({ day: key, label, views: r ? Number(r.views || 0) : 0, visitors: r ? Number(r.visitors || 0) : 0 })
+    d = granularity === 'month'
+      ? new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1))
+      : new Date(d.getTime() + (granularity === 'hour' ? 3600e3 : 864e5))
   }
   return out
 }
@@ -1001,7 +1035,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
       <div>
         <h1 class="leading-none text-2xl md:text-[28px] wordmark">ghostanalytics</h1>
         <p class="mt-2 text-sm" style="color: var(--text-3)">
-          Site <span class="mono" style="color: var(--text-2)">{{ siteId }}</span> · last {{ days }} days
+          Site <span class="mono" style="color: var(--text-2)">{{ siteId }}</span> · {{ isAll ? 'all time' : ('last ' + days + ' days') }}
         </p>
         <!-- Site switcher (server-rendered, owner-scoped — mirrors bughq): the
             <select> navigates by rewriting ?site=; the plain-text line above is
@@ -1040,7 +1074,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
         @endforeach
         <a href="{{ compareToggleUrl() }}" title="Overlay the previous period on the chart"
           class="px-3.5 py-1.5 font-medium text-sm border pill"
-          style="{{ compare ? 'color: #fff; background: var(--accent); border-color: var(--accent)' : 'color: var(--text-2); border-color: var(--border)' }}">Compare</a>
+          style="{{ isAll ? 'display:none' : (compare ? 'color: #fff; background: var(--accent); border-color: var(--accent)' : 'color: var(--text-2); border-color: var(--border)') }}">Compare</a>
         <button type="button" @click="exportCsv"
           class="px-3.5 py-1.5 font-medium text-sm border pill"
           style="color: var(--text-2); border-color: var(--border); background: var(--panel); cursor: pointer;">Export CSV</button>
