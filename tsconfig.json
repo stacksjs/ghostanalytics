@@ -18,18 +18,13 @@
     "skipLibCheck": true,
     "allowImportingTsExtensions": true,
     "paths": {
-      // Router is the ONE @stacksjs/* we pin to the vendored core src (the rest
-      // resolve from node_modules). Reason: the framework mixes relative imports
-      // (route-loader.ts -> ./stacks-router) with package imports (dev/api.ts ->
-      // @stacksjs/router). With a vendored core AND node_modules dist present,
-      // those load two physically distinct Router singletons — routes register on
-      // one, serve() runs the other, every route 404s (stacksjs/stacks#1975). The
-      // upstream fix (#1982, shares the route table across copies via Symbol.for)
-      // is unreleased, so we pin resolution to the single vendored copy that
-      // carries it. Drop this mapping once node_modules ships a router >= the
-      // release containing #1982.
-      "@stacksjs/router": ["./storage/framework/core/router/src/index.ts"],
-      "@stacksjs/router/*": ["./storage/framework/core/router/src/*"],
+      // @stacksjs/router now resolves from node_modules like every other
+      // @stacksjs/* package. It was previously pinned to the vendored core src to
+      // avoid the two-Router-singletons bug (stacksjs/stacks#1975) that arises only
+      // when a vendored core AND the node_modules dist coexist. With the vendored
+      // storage/framework/ tree removed (framework-as-dependencies), there is a
+      // single physical router copy — the bundled node_modules dist — so the pin
+      // is unnecessary and would point at a nonexistent path.
       "Actions/*": ["./app/Actions/*"],
       "Commands/*": ["./app/Commands/*"],
       "Jobs/*": ["./app/Jobs/*"],

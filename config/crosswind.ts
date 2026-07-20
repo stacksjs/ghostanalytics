@@ -6,9 +6,12 @@ export default {
   content: [
     './resources/views/**/*.{stx,html}',
     './resources/**/*.{stx,html}',
-    './storage/framework/defaults/resources/views/**/*.{stx,html}',
-    './storage/framework/defaults/resources/components/**/*.{stx,html}',
-    './storage/framework/core/error-handling/src/views/**/*.{stx,html}',
+    // Framework defaults now resolve from the published @stacksjs/defaults package
+    // (framework-as-dependencies) rather than the vendored storage/framework/ tree.
+    // The error-page views moved under defaults/resources/views/errors, so the
+    // views glob below covers them too.
+    './node_modules/@stacksjs/defaults/resources/views/**/*.{stx,html}',
+    './node_modules/@stacksjs/defaults/resources/components/**/*.{stx,html}',
   ],
   preflight: true,
   minify: false,
