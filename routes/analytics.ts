@@ -544,6 +544,9 @@ route.delete('/api/sites/{siteId}/share', async (request: any) => {
 
 route.get('/api/sites/{siteId}/stats', async (request: any) => {
   const siteId = request.params.siteId
+  const denied = await requireSiteOwner(request, siteId)
+  if (denied)
+    return denied
   const { from, to } = window(request)
   const row = (await pgq(
     `SELECT COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors, COUNT(DISTINCT session_id) AS sessions
@@ -556,10 +559,13 @@ route.get('/api/sites/{siteId}/stats', async (request: any) => {
     sessions: Number(row?.sessions ?? 0),
     range: { from, to },
   })
-})
+}).middleware('auth')
 
 route.get('/api/sites/{siteId}/timeseries', async (request: any) => {
   const siteId = request.params.siteId
+  const denied = await requireSiteOwner(request, siteId)
+  if (denied)
+    return denied
   const { from, to } = window(request)
   const rows = await pgq(
     `SELECT LEFT(timestamp, 10) AS day, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors
@@ -568,10 +574,13 @@ route.get('/api/sites/{siteId}/timeseries', async (request: any) => {
     [siteId, from, to],
   )
   return json({ series: rows ?? [] })
-})
+}).middleware('auth')
 
 route.get('/api/sites/{siteId}/pages', async (request: any) => {
   const siteId = request.params.siteId
+  const denied = await requireSiteOwner(request, siteId)
+  if (denied)
+    return denied
   const { from, to } = window(request)
   const rows = await pgq(
     `SELECT path, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors
@@ -580,10 +589,13 @@ route.get('/api/sites/{siteId}/pages', async (request: any) => {
     [siteId, from, to],
   )
   return json({ pages: rows ?? [] })
-})
+}).middleware('auth')
 
 route.get('/api/sites/{siteId}/referrers', async (request: any) => {
   const siteId = request.params.siteId
+  const denied = await requireSiteOwner(request, siteId)
+  if (denied)
+    return denied
   const { from, to } = window(request)
   const rows = await pgq(
     `SELECT referrer_source AS source, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors
@@ -592,7 +604,7 @@ route.get('/api/sites/{siteId}/referrers', async (request: any) => {
     [siteId, from, to],
   )
   return json({ referrers: rows ?? [] })
-})
+}).middleware('auth')
 
 // ---------------------------------------------------------------------------
 // Tracker script + health
