@@ -1,0 +1,106 @@
+<script server>
+const appName = 'ghostanalytics'
+
+const meta = {
+  title: 'ghostanalytics vs the alternatives - every option compared',
+  description: 'How ghostanalytics compares to Google Analytics, Plausible, Fathom, Simple Analytics, Umami, and Matomo. Cookieless, exact, and privacy-first by design.',
+}
+
+const alternatives = [
+  { slug: 'google-analytics', name: 'vs Google Analytics', desc: 'The GA4 alternative with no cookie banner, no sampling, and one-click import.' },
+  { slug: 'plausible', name: 'vs Plausible', desc: 'Two cookieless tools — how the reports, pricing, and ownership differ.' },
+  { slug: 'fathom', name: 'vs Fathom', desc: 'Both privacy-first. Where ghostanalytics goes further on data ownership.' },
+  { slug: 'simple-analytics', name: 'vs Simple Analytics', desc: 'Aggregate-only analytics, compared feature for feature.' },
+  { slug: 'umami', name: 'vs Umami', desc: 'Open-source analytics, and where the privacy lines are drawn.' },
+  { slug: 'matomo', name: 'vs Matomo', desc: 'The lighter, cookieless alternative to the classic GA replacement.' },
+]
+
+const pillars = [
+  { h: 'Cookieless by design', b: 'No cookies, no local storage, no consent banner, on every one of these comparisons. Nothing is written to a visitor’s device.' },
+  { h: 'You own the data', b: 'Every event lands in your own PostgreSQL database. It is never sampled, sold, or shared with an ad network.' },
+  { h: 'Exact, not estimated', b: 'Every event is counted. No sampling, no thresholds, no “data not available” once your traffic grows.' },
+]
+</script>
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ meta.title }}</title>
+    <meta name="description" content="{{ meta.description }}">
+    <meta name="theme-color" content="#0a0c0e">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap">
+    <link rel="stylesheet" href="/marketing.css">
+  </head>
+  <body>
+    @include('site-nav')
+
+    <main>
+      <nav class="shell subnav" aria-label="Breadcrumb">
+        <a href="/">Home</a><span class="sep">/</span>
+        <span>Compare</span>
+      </nav>
+
+      <section class="feat-hero shell">
+        <span class="kicker">Compare</span>
+        <h1>Every alternative, compared honestly.</h1>
+        <p>Whichever analytics tool you are weighing, the same three things hold: no cookies, exact numbers, and data that stays yours. Pick a comparison to see it point for point.</p>
+        <div class="hero-actions">
+          <a class="btn primary" href="/#install">Get your script tag</a>
+          <a class="btn ghost" href="/features/privacy" data-no-router>How the privacy works</a>
+        </div>
+      </section>
+
+      <section class="reveal section shell" aria-labelledby="alts-heading">
+        <div class="section-head">
+          <h2 id="alts-heading" class="section-title">Pick a comparison</h2>
+        </div>
+        <div class="related">
+          @foreach (alternatives as a)
+            <a href="/compare/{{ a.slug }}" data-no-router>
+              <div class="r-name">{{ a.name }}</div>
+              <div class="r-desc">{{ a.desc }}</div>
+            </a>
+          @endforeach
+        </div>
+      </section>
+
+      <section class="reveal section shell" aria-labelledby="pillars-heading">
+        <div class="section-head">
+          <h2 id="pillars-heading" class="section-title">What stays true across every comparison</h2>
+        </div>
+        <div class="chips">
+          @foreach (pillars as p)
+            <div class="chip">
+              <h3>{{ p.h }}</h3>
+              <p>{{ p.b }}</p>
+            </div>
+          @endforeach
+        </div>
+      </section>
+
+      <section class="reveal section shell" aria-label="Get started">
+        <div class="cta-band">
+          <h2>Your numbers. Your visitors' privacy. Both intact.</h2>
+          <div class="cta-actions">
+            <a class="btn primary" href="/#install">Get your script tag</a>
+            <a class="btn ghost" href="/dashboard" data-no-router>See a live dashboard</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer shell">
+      <div class="footer-bottom" style="border-top: none">
+        <a class="brand" href="/" aria-label="ghostanalytics home">
+          <span class="brand-mark">g</span>
+          <span class="brand-name">{{ appName }}</span>
+        </a>
+        <span>No cookies. No personal data. Powered by Stacks and PostgreSQL.</span>
+      </div>
+    </footer>
+  </body>
+</html>

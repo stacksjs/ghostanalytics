@@ -1,0 +1,152 @@
+<script server>
+const appName = 'ghostanalytics'
+
+const meta = {
+  title: 'ghostanalytics vs Plausible - privacy-first analytics, compared',
+  description: 'Two cookieless, privacy-first analytics tools compared. Where ghostanalytics goes further: your own PostgreSQL database and country-only geolocation.',
+}
+
+// dim / competitor / ghostanalytics — reuses the home comparison grid styling.
+const rows = [
+  { dim: 'Cookies and consent', them: 'Cookieless, no banner — genuinely privacy-first', us: 'Cookieless, no banner — the same baseline.' },
+  { dim: 'Where your data lives', them: 'Plausible Cloud hosts it on their EU servers', us: 'Your own PostgreSQL database, wherever you run it.' },
+  { dim: 'Geolocation', them: 'Resolves to city level', us: 'Country only, on purpose — the stricter line.' },
+  { dim: 'Accuracy', them: 'Exact, no sampling', us: 'Exact, no sampling — the same.' },
+  { dim: 'Visitor identity', them: '24-hour rotating salt', us: '24-hour rotating, per-site hash — the same.' },
+  { dim: 'Ecosystem', them: 'Standalone SaaS, self-hostable', us: 'Native to the Stacks toolchain: Postgres, queues, deploy.' },
+  { dim: 'Licence', them: 'Open source (AGPL)', us: 'Open source, and Postgres-native.' },
+]
+
+const reasons = [
+  { n: '01', h: 'Your data, in your own database', b: 'Plausible is a great cookieless tool, but on Plausible Cloud your analytics live on their servers. ghostanalytics writes every event to a PostgreSQL table you own and can query directly — no separate store to trust.' },
+  { n: '02', h: 'Country-only, on purpose', b: 'Plausible now resolves visitor location to city level. ghostanalytics deliberately stops at country, keeping the stricter privacy line and nothing more granular than it needs.' },
+  { n: '03', h: 'Part of your stack, not another service', b: 'ghostanalytics runs inside the Stacks toolchain, on the same Postgres, queue, and deploy you already operate. There is no extra analytics service to run alongside your app.' },
+]
+
+const metrics = [
+  { v: 'Country-only', l: 'No city, region, or coordinates — ever. Stricter than city-level geo.' },
+  { v: 'Your Postgres', l: 'Every event lands in a database you own, not a managed store.' },
+  { v: '24h', l: 'Rotating per-site hash: no cross-day and no cross-site identity.' },
+]
+
+const related = [
+  { slug: 'fathom', name: 'vs Fathom', desc: 'How the cookieless options compare.' },
+  { slug: 'simple-analytics', name: 'vs Simple Analytics', desc: 'Aggregate-only analytics, side by side.' },
+  { slug: '', name: 'All alternatives', desc: 'Every analytics alternative, compared.' },
+]
+</script>
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ meta.title }}</title>
+    <meta name="description" content="{{ meta.description }}">
+    <meta name="theme-color" content="#0a0c0e">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap">
+    <link rel="stylesheet" href="/marketing.css">
+  </head>
+  <body>
+    @include('site-nav')
+
+    <main>
+      <nav class="shell subnav" aria-label="Breadcrumb">
+        <a href="/">Home</a><span class="sep">/</span>
+        <a href="/compare" data-no-router>Compare</a><span class="sep">/</span>
+        <span>Plausible</span>
+      </nav>
+
+      <section class="feat-hero shell">
+        <span class="kicker">ghostanalytics vs Plausible</span>
+        <h1>Two privacy-first tools. One keeps your data in your database.</h1>
+        <p>Plausible is a respected, cookieless analytics tool, and on the basics the two are close: no cookies, no consent banner, exact counts. The difference is where your data lives and how far the privacy line is drawn.</p>
+        <div class="hero-actions">
+          <a class="btn primary" href="/#install">Get your script tag</a>
+          <a class="btn ghost" href="/features/privacy" data-no-router>How the privacy works</a>
+        </div>
+      </section>
+
+      <section class="reveal section shell" aria-labelledby="cmp-heading">
+        <div class="section-head">
+          <p class="eyebrow">Plausible vs ghostanalytics</p>
+          <h2 id="cmp-heading" class="section-title">Point for point.</h2>
+        </div>
+        <div class="cmp">
+          @foreach (rows as row)
+            <div class="cmp-cell">
+              <span class="cmp-dim">{{ row.dim }}</span>
+              <span class="cmp-ga">{{ row.them }}</span>
+              <span class="cmp-ghost">{{ row.us }}</span>
+            </div>
+          @endforeach
+        </div>
+      </section>
+
+      <section class="reveal section shell" aria-labelledby="why-heading">
+        <div class="section-head">
+          <h2 id="why-heading" class="section-title">Where ghostanalytics goes further.</h2>
+          <p class="section-intro">Plausible does plenty ghostanalytics does not — funnels, Search Console, a Looker connector, spike alerts. If those are what you need, it is an excellent choice. Here is where ghostanalytics leads instead.</p>
+        </div>
+        <div class="flow">
+          @foreach (reasons as step)
+            <div class="flow-step">
+              <span class="flow-num">{{ step.n }}</span>
+              <div>
+                <h3>{{ step.h }}</h3>
+                <p>{{ step.b }}</p>
+              </div>
+            </div>
+          @endforeach
+        </div>
+      </section>
+
+      <section class="reveal section shell" aria-label="At a glance">
+        <div class="metrics">
+          @foreach (metrics as m)
+            <div class="metric">
+              <div class="m-value">{{ m.v }}</div>
+              <div class="m-label">{{ m.l }}</div>
+            </div>
+          @endforeach
+        </div>
+      </section>
+
+      <section class="reveal section shell" aria-labelledby="related-heading">
+        <div class="section-head">
+          <h2 id="related-heading" class="section-title">Keep comparing</h2>
+        </div>
+        <div class="related">
+          @foreach (related as r)
+            <a href="/compare/{{ r.slug }}" data-no-router>
+              <div class="r-name">{{ r.name }}</div>
+              <div class="r-desc">{{ r.desc }}</div>
+            </a>
+          @endforeach
+        </div>
+      </section>
+
+      <section class="reveal section shell" aria-label="Get started">
+        <div class="cta-band">
+          <h2>Your numbers. Your visitors' privacy. Your database.</h2>
+          <div class="cta-actions">
+            <a class="btn primary" href="/#install">Get your script tag</a>
+            <a class="btn ghost" href="/dashboard" data-no-router>See a live dashboard</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer shell">
+      <div class="footer-bottom" style="border-top: none">
+        <a class="brand" href="/" aria-label="ghostanalytics home">
+          <span class="brand-mark">g</span>
+          <span class="brand-name">{{ appName }}</span>
+        </a>
+        <span>No cookies. No personal data. Powered by Stacks and PostgreSQL.</span>
+      </div>
+    </footer>
+  </body>
+</html>

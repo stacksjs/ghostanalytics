@@ -50,38 +50,36 @@ const comparison = [
   { dim: 'Leaving', ga: 'Export is a project', ghost: 'One-click GA import, both ways' },
 ]
 
-const footerGroups = [
-  { title: 'Product', links: [
-    { label: 'Features', url: '#features' },
-    { label: 'Live demo', url: '/dashboard', native: true },
-    { label: 'Pricing', url: '#' },
-    { label: 'Changelog', url: '#' },
-    { label: 'Status', url: '#' },
-  ] },
-  { title: 'Developers', links: [
-    { label: 'Install guide', url: '#install' },
-    { label: 'Script and API reference', url: '/docs', native: true },
-    { label: 'Custom events', url: '#install' },
-    { label: 'Self-hosting', url: '/docs', native: true },
-    { label: 'GitHub', url: 'https://github.com/stacksjs/ghostanalytics', native: true },
-  ] },
-  { title: 'Compare', links: [
-    { label: 'vs Google Analytics', url: '#compare' },
-    { label: 'vs Fathom', url: '#compare' },
-    { label: 'vs Plausible', url: '#compare' },
-    { label: 'Import from GA', url: '#' },
-  ] },
-  { title: 'Company', links: [
-    { label: 'About', url: '#' },
-    { label: 'Blog', url: '/blog', native: true },
-    { label: 'Contact', url: '#' },
-  ] },
-  { title: 'Privacy and legal', links: [
-    { label: 'Privacy policy', url: '#' },
-    { label: 'Data processing (DPA)', url: '#' },
-    { label: 'GDPR', url: '#privacy' },
-    { label: 'Terms', url: '#' },
-  ] },
+// Footer columns are separate top-level arrays, each rendered with a single
+// @foreach. (A nested @foreach over a loop variable's property does not render
+// server-side in stx — it compiles to a client @for with no data.)
+const footerProduct = [
+  { label: 'Features', url: '#features' },
+  { label: 'Pricing', url: '/pricing', native: true },
+  { label: 'Live demo', url: '/dashboard', native: true },
+]
+const footerDevelopers = [
+  { label: 'Install guide', url: '#install' },
+  { label: 'Script and API reference', url: '/docs', native: true },
+  { label: 'Custom events', url: '#install' },
+  { label: 'Import from GA', url: '/features/import', native: true },
+  { label: 'Self-hosting', url: '/docs', native: true },
+  { label: 'GitHub', url: 'https://github.com/stacksjs/ghostanalytics', native: true },
+]
+const footerCompare = [
+  { label: 'All alternatives', url: '/compare', native: true },
+  { label: 'vs Google Analytics', url: '/compare/google-analytics', native: true },
+  { label: 'vs Plausible', url: '/compare/plausible', native: true },
+  { label: 'vs Fathom', url: '/compare/fathom', native: true },
+  { label: 'vs Simple Analytics', url: '/compare/simple-analytics', native: true },
+  { label: 'vs Umami', url: '/compare/umami', native: true },
+  { label: 'vs Matomo', url: '/compare/matomo', native: true },
+]
+const footerResources = [
+  { label: 'Documentation', url: '/docs', native: true },
+  { label: 'Privacy by design', url: '/features/privacy', native: true },
+  { label: 'Live demo', url: '/dashboard', native: true },
+  { label: 'GitHub', url: 'https://github.com/stacksjs/ghostanalytics', native: true },
 ]
 </script>
 
@@ -206,7 +204,7 @@ function pickFramework(e) {
         <section class="reveal section shell" aria-label="Migrate from Google Analytics">
           <div class="migrate">
             <p>Moving off Google Analytics? Import your GA history in one click and keep every chart you already track.</p>
-            <a class="textlink" href="#">See the import guide</a>
+            <a class="textlink" href="/features/import" data-no-router>See the import guide</a>
           </div>
         </section>
 
@@ -302,14 +300,30 @@ function pickFramework(e) {
               </a>
             </span>
           </div>
-          @foreach (footerGroups as group)
-            <div class="footer-col">
-              <h4>{{ group.title }}</h4>
-              @foreach (group.links as link)
-                <a href="{{ link.url }}" {{ link.native ? 'data-no-router' : '' }}>{{ link.label }}</a>
-              @endforeach
-            </div>
-          @endforeach
+          <div class="footer-col">
+            <h4>Product</h4>
+            @foreach (footerProduct as link)
+              <a href="{{ link.url }}" data-no-router>{{ link.label }}</a>
+            @endforeach
+          </div>
+          <div class="footer-col">
+            <h4>Developers</h4>
+            @foreach (footerDevelopers as link)
+              <a href="{{ link.url }}" data-no-router>{{ link.label }}</a>
+            @endforeach
+          </div>
+          <div class="footer-col">
+            <h4>Compare</h4>
+            @foreach (footerCompare as link)
+              <a href="{{ link.url }}" data-no-router>{{ link.label }}</a>
+            @endforeach
+          </div>
+          <div class="footer-col">
+            <h4>Resources</h4>
+            @foreach (footerResources as link)
+              <a href="{{ link.url }}" data-no-router>{{ link.label }}</a>
+            @endforeach
+          </div>
         </div>
         <div class="footer-bottom">
           <span>© 2026 ghostanalytics</span>

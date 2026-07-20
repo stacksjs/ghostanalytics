@@ -1,0 +1,124 @@
+<script server>
+const appName = 'ghostanalytics'
+
+const meta = {
+  title: 'Import from Google Analytics - ghostanalytics',
+  description: 'Move off Google Analytics without losing your history. Import your GA data into ghostanalytics and keep the charts you already track — no gaps, no lock-in.',
+}
+
+const flow = [
+  { n: '01', h: 'Point us at your GA property', b: 'Connect the Google Analytics property you are leaving. Nothing changes on your live site, and your existing GA account is untouched.' },
+  { n: '02', h: 'We map GA to ghostanalytics', b: 'Sessions, pageviews, sources, campaigns, and countries are mapped onto the ghostanalytics model, so the reports you rely on line up.' },
+  { n: '03', h: 'Your history backfills', b: 'Past traffic lands in your own PostgreSQL database alongside new events, so the timeline is continuous the day you switch.' },
+]
+
+const metrics = [
+  { v: '1 click', l: 'Bring your GA history over without a spreadsheet or a migration project.' },
+  { v: 'Both ways', l: 'Import in, full export out. Your data is never locked in.' },
+  { v: 'No gaps', l: 'Imported history sits beside live events, so charts stay continuous.' },
+]
+
+const related = [
+  { slug: 'metrics', name: 'Pageviews and sessions', desc: 'What your imported history rolls up into.' },
+  { slug: 'sources', name: 'Sources and referrers', desc: 'Where your historical traffic came from.' },
+  { slug: 'privacy', name: 'Privacy by design', desc: 'Why the switch needs no cookie banner.' },
+]
+</script>
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ meta.title }}</title>
+    <meta name="description" content="{{ meta.description }}">
+    <meta name="theme-color" content="#0a0c0e">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap">
+    <link rel="stylesheet" href="/marketing.css">
+  </head>
+  <body>
+    @include('site-nav')
+
+    <main>
+      <nav class="shell subnav" aria-label="Breadcrumb">
+        <a href="/">Home</a><span class="sep">/</span>
+        <a href="/#features">Features</a><span class="sep">/</span>
+        <span>Import from Google Analytics</span>
+      </nav>
+
+      <section class="feat-hero shell">
+        <span class="kicker">GA import</span>
+        <h1>Leave Google Analytics. Keep every chart.</h1>
+        <p>Switching should not mean starting your history from zero. Import your Google Analytics data into ghostanalytics, keep the trends you already watch, and never touch a cookie banner again.</p>
+        <div class="hero-actions">
+          <a class="btn primary" href="/#install">Get your script tag</a>
+          <a class="btn ghost" href="/compare/google-analytics" data-no-router>ghostanalytics vs GA</a>
+        </div>
+      </section>
+
+      <section class="reveal section shell" aria-labelledby="how-heading">
+        <div class="section-head">
+          <h2 id="how-heading" class="section-title">From GA to ghostanalytics in three steps.</h2>
+        </div>
+        <div class="flow">
+          @foreach (flow as step)
+            <div class="flow-step">
+              <span class="flow-num">{{ step.n }}</span>
+              <div>
+                <h3>{{ step.h }}</h3>
+                <p>{{ step.b }}</p>
+              </div>
+            </div>
+          @endforeach
+        </div>
+      </section>
+
+      <section class="reveal section shell" aria-label="What you get">
+        <div class="metrics">
+          @foreach (metrics as m)
+            <div class="metric">
+              <div class="m-value">{{ m.v }}</div>
+              <div class="m-label">{{ m.l }}</div>
+            </div>
+          @endforeach
+        </div>
+      </section>
+
+      <section class="reveal section shell" aria-labelledby="related-heading">
+        <div class="section-head">
+          <h2 id="related-heading" class="section-title">Pairs well with</h2>
+        </div>
+        <div class="related">
+          @foreach (related as r)
+            <a href="/features/{{ r.slug }}" data-no-router>
+              <div class="r-name">{{ r.name }}</div>
+              <div class="r-desc">{{ r.desc }}</div>
+            </a>
+          @endforeach
+        </div>
+      </section>
+
+      <section class="reveal section shell" aria-label="Get started">
+        <div class="cta-band">
+          <h2>Bring your history. Leave the tracking behind.</h2>
+          <div class="cta-actions">
+            <a class="btn primary" href="/#install">Get your script tag</a>
+            <a class="btn ghost" href="/docs" data-no-router>Read the docs</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer shell">
+      <div class="footer-bottom" style="border-top: none">
+        <a class="brand" href="/" aria-label="ghostanalytics home">
+          <span class="brand-mark">g</span>
+          <span class="brand-name">{{ appName }}</span>
+        </a>
+        <span>No cookies. No personal data. Powered by Stacks and PostgreSQL.</span>
+      </div>
+    </footer>
+  </body>
+</html>

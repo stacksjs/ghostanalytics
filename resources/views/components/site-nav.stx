@@ -21,6 +21,7 @@
           <a role="menuitem" href="/features/geography" data-no-router><span class="mega-t">Geography &amp; devices</span><span class="mega-d">Country, device, browser, and OS.</span></a>
           <a role="menuitem" href="/features/web-vitals" data-no-router><span class="mega-t">Core Web Vitals</span><span class="mega-d">Real-user LCP, INP, and CLS beside traffic.</span></a>
           <a role="menuitem" href="/features/privacy" data-no-router><span class="mega-t">Privacy by design</span><span class="mega-d">No cookies, no consent banner, no personal data.</span></a>
+          <a role="menuitem" href="/features/import" data-no-router><span class="mega-t">Import from Google Analytics</span><span class="mega-d">Bring your GA history over in one click.</span></a>
         </div>
       </div>
 
@@ -36,8 +37,8 @@
         </div>
       </div>
 
-      <a href="/features/privacy" data-no-router>Privacy</a>
-      <a href="/#compare" data-no-router>Compare</a>
+      <a href="/pricing" data-no-router>Pricing</a>
+      <a href="/compare" data-no-router>Compare</a>
       <a href="/docs" data-no-router>Docs</a>
       <a href="https://github.com/stacksjs/ghostanalytics" data-no-router>GitHub</a>
     </div>
@@ -56,6 +57,7 @@
         <a href="/features/geography" data-no-router>Geography &amp; devices</a>
         <a href="/features/web-vitals" data-no-router>Core Web Vitals</a>
         <a href="/features/privacy" data-no-router>Privacy by design</a>
+        <a href="/features/import" data-no-router>Import from Google Analytics</a>
 
         <span class="nav-menu-group">Use cases</span>
         <a href="/use-cases" data-no-router>All use cases</a>
@@ -66,7 +68,8 @@
         <a href="/use-cases/developers" data-no-router>Developers</a>
 
         <span class="nav-menu-group">More</span>
-        <a href="/#compare" data-no-router>Compare</a>
+        <a href="/pricing" data-no-router>Pricing</a>
+        <a href="/compare" data-no-router>Compare</a>
         <a href="/docs" data-no-router>Docs</a>
         <a href="https://github.com/stacksjs/ghostanalytics" data-no-router>GitHub</a>
         <a href="/login">Log in</a>
