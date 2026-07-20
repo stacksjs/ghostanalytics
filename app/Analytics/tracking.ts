@@ -29,6 +29,32 @@ export function hashVisitor(ip: string, ua: string, siteId: string, date = new D
   return createHash('sha256').update(`${ip}|${ua}|${siteId}|${salt}`).digest('hex').slice(0, 32)
 }
 
+/**
+ * Store a referrer without its query string or fragment.
+ *
+ * A referral URL's `?query` can carry identifiers minted by the *referring* site
+ * (click ids, session tokens, emails), so we keep only `origin + pathname` —
+ * enough for the referrers report — and drop everything after. Deterministic, so
+ * the same referrer always aggregates to one row. Non-URL values still get `?`/`#`
+ * and anything after them stripped. Result is clipped to a varchar(255). See #6.
+ */
+export function cleanReferrer(v: unknown): string | null {
+  if (typeof v !== 'string')
+    return null
+  const t = v.trim()
+  if (!t)
+    return null
+  let stripped: string
+  try {
+    const u = new URL(t)
+    stripped = u.origin + u.pathname
+  }
+  catch {
+    stripped = t.split(/[?#]/)[0]
+  }
+  return stripped.length > 255 ? stripped.slice(0, 255) : stripped
+}
+
 /** Best-effort client IP from common proxy/CDN headers. */
 export function clientIp(headers: Headers): string {
   return (

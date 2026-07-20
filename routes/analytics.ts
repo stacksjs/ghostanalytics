@@ -11,6 +11,7 @@ import { createHash } from 'node:crypto'
 import { db } from '@stacksjs/database'
 import { response, route } from '@stacksjs/router'
 import {
+  cleanReferrer,
   clientIp,
   geoCountry,
   hashVisitor,
@@ -188,7 +189,7 @@ route.post('/collect', async (request: any) => {
     visitor_id: visitorId,
     entry_path: path,
     exit_path: path,
-    referrer: clip255(body.r),
+    referrer: cleanReferrer(body.r),
     referrer_source: source,
     country: country ?? null,
     device_type: info.deviceType,
@@ -211,7 +212,7 @@ route.post('/collect', async (request: any) => {
       path,
       hostname: url?.hostname ?? null,
       title: clip255(body.t),
-      referrer: clip255(body.r),
+      referrer: cleanReferrer(body.r),
       referrer_source: source,
       utm_source: utmParam(body.utm_source),
       utm_medium: utmParam(body.utm_medium),
