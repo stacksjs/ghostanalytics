@@ -729,6 +729,83 @@ route.get('/api/sites/{siteId}/referrers', async (request: any) => {
   return json({ referrers: rows ?? [] })
 }).middleware('auth')
 
+// Owner-gated "top <dimension>" reports over page_views, so every dashboard
+// breakdown has a documented JSON endpoint too (issue #15). `column` is always a
+// fixed literal from the registrations below (never user input), so
+// interpolating it into the query is safe.
+function topDimension(path: string, column: string, key: string): void {
+  route.get(path, async (request: any) => {
+    const siteId = request.params.siteId
+    const denied = await requireSiteOwner(request, siteId)
+    if (denied)
+      return denied
+    const { from, to } = window(request)
+    const rows = await pgq(
+      `SELECT ${column} AS name, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors
+      FROM page_views WHERE site_id = ? AND timestamp >= ? AND timestamp <= ? AND ${column} IS NOT NULL AND ${column} <> ''
+      GROUP BY ${column} ORDER BY views DESC LIMIT 20`,
+      [siteId, from, to],
+    )
+    return json({ [key]: rows ?? [] })
+  }).middleware('auth')
+}
+
+topDimension('/api/sites/{siteId}/countries', 'country', 'countries')
+topDimension('/api/sites/{siteId}/devices', 'device_type', 'devices')
+topDimension('/api/sites/{siteId}/browsers', 'browser', 'browsers')
+topDimension('/api/sites/{siteId}/operating-systems', 'os', 'operating_systems')
+topDimension('/api/sites/{siteId}/utm/sources', 'utm_source', 'sources')
+topDimension('/api/sites/{siteId}/utm/mediums', 'utm_medium', 'mediums')
+topDimension('/api/sites/{siteId}/utm/campaigns', 'utm_campaign', 'campaigns')
+
+// Custom events, by name.
+route.get('/api/sites/{siteId}/events', async (request: any) => {
+  const siteId = request.params.siteId
+  const denied = await requireSiteOwner(request, siteId)
+  if (denied)
+    return denied
+  const { from, to } = window(request)
+  const rows = await pgq(
+    `SELECT name, COUNT(*) AS events, COUNT(DISTINCT visitor_id) AS visitors
+    FROM custom_events WHERE site_id = ? AND timestamp >= ? AND timestamp <= ?
+    GROUP BY name ORDER BY events DESC LIMIT 20`,
+    [siteId, from, to],
+  )
+  return json({ events: rows ?? [] })
+}).middleware('auth')
+
+// Entry pages (session first page).
+route.get('/api/sites/{siteId}/entry-pages', async (request: any) => {
+  const siteId = request.params.siteId
+  const denied = await requireSiteOwner(request, siteId)
+  if (denied)
+    return denied
+  const { from, to } = window(request)
+  const rows = await pgq(
+    `SELECT entry_path AS path, COUNT(*) AS sessions, COUNT(DISTINCT visitor_id) AS visitors
+    FROM sessions WHERE site_id = ? AND started_at >= ? AND started_at <= ?
+    GROUP BY entry_path ORDER BY sessions DESC LIMIT 20`,
+    [siteId, from, to],
+  )
+  return json({ entry_pages: rows ?? [] })
+}).middleware('auth')
+
+// Exit pages (session last page).
+route.get('/api/sites/{siteId}/exit-pages', async (request: any) => {
+  const siteId = request.params.siteId
+  const denied = await requireSiteOwner(request, siteId)
+  if (denied)
+    return denied
+  const { from, to } = window(request)
+  const rows = await pgq(
+    `SELECT exit_path AS path, COUNT(*) AS sessions, COUNT(DISTINCT visitor_id) AS visitors
+    FROM sessions WHERE site_id = ? AND started_at >= ? AND started_at <= ?
+    GROUP BY exit_path ORDER BY sessions DESC LIMIT 20`,
+    [siteId, from, to],
+  )
+  return json({ exit_pages: rows ?? [] })
+}).middleware('auth')
+
 // ---------------------------------------------------------------------------
 // Tracker script + health
 // ---------------------------------------------------------------------------

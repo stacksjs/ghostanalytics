@@ -27,6 +27,20 @@ const READ_ENDPOINTS = [
   '/api/sites/{siteId}/timeseries',
   '/api/sites/{siteId}/pages',
   '/api/sites/{siteId}/referrers',
+  '/api/sites/{siteId}/events',
+  '/api/sites/{siteId}/entry-pages',
+  '/api/sites/{siteId}/exit-pages',
+]
+
+// The page_views breakdowns are registered through one shared helper.
+const TOP_DIMENSIONS = [
+  '/api/sites/{siteId}/countries',
+  '/api/sites/{siteId}/devices',
+  '/api/sites/{siteId}/browsers',
+  '/api/sites/{siteId}/operating-systems',
+  '/api/sites/{siteId}/utm/sources',
+  '/api/sites/{siteId}/utm/mediums',
+  '/api/sites/{siteId}/utm/campaigns',
 ]
 
 describe('guardrail: site-scoped read endpoints are owner-gated', () => {
@@ -36,6 +50,22 @@ describe('guardrail: site-scoped read endpoints are owner-gated', () => {
       expect(block).not.toBe('')
       expect(block).toContain('requireSiteOwner(request, siteId)')
       expect(block).toContain('.middleware(\'auth\')')
+    })
+  }
+})
+
+describe('guardrail: top-dimension reports are owner-gated', () => {
+  test('the topDimension helper enforces auth + site ownership', () => {
+    const i = analytics.indexOf('function topDimension(')
+    expect(i).toBeGreaterThan(-1)
+    const block = analytics.slice(i, i + 900)
+    expect(block).toContain('requireSiteOwner(request, siteId)')
+    expect(block).toContain('.middleware(\'auth\')')
+  })
+
+  for (const path of TOP_DIMENSIONS) {
+    test(`${path} is registered through the gated helper`, () => {
+      expect(analytics).toContain(`topDimension('${path}'`)
     })
   }
 })
