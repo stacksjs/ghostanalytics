@@ -39,3 +39,23 @@ describe('guardrail: site-scoped read endpoints are owner-gated', () => {
     })
   }
 })
+
+// Erasure endpoints delete data, so they must be at least as gated as reads.
+const DELETE_DECLS = [
+  'route.delete(\'/api/sites/{siteId}/data\'',
+  'route.delete(\'/api/sites/{siteId}/visitors/{visitorId}\'',
+]
+
+describe('guardrail: data-erasure endpoints are owner-gated', () => {
+  for (const decl of DELETE_DECLS) {
+    test(`${decl.slice(12)} enforces auth + site ownership`, () => {
+      const i = analytics.indexOf(decl)
+      expect(i).toBeGreaterThan(-1)
+      const rest = analytics.slice(i)
+      const end = rest.indexOf('\nroute.')
+      const block = end === -1 ? rest : rest.slice(0, end)
+      expect(block).toContain('requireSiteOwner(request, siteId)')
+      expect(block).toContain('.middleware(\'auth\')')
+    })
+  }
+})

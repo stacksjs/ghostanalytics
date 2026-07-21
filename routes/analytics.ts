@@ -543,6 +543,58 @@ route.delete('/api/sites/{siteId}/share', async (request: any) => {
   return json({ ok: true })
 }).middleware('auth').skipCsrf()
 
+// ---------------------------------------------------------------------------
+// Data deletion / erasure (management API)
+// ---------------------------------------------------------------------------
+// Operator + GDPR erasure. Owner-scoped. Visitor-level analytics live in these
+// four tables (all keyed by site_id, and by the pseudonymous visitor_id).
+const EVENT_TABLES = ['page_views', 'sessions', 'custom_events', 'conversions'] as const
+
+/** Delete rows from every event table for a site, optionally scoped to one
+ * visitor. Returns per-table deleted counts (via RETURNING). */
+async function eraseRows(siteId: string, visitorId?: string): Promise<Record<string, number>> {
+  const deleted: Record<string, number> = {}
+  for (const t of EVENT_TABLES) {
+    const rows = visitorId
+      ? await pgq(`DELETE FROM "${t}" WHERE site_id = ? AND visitor_id = ? RETURNING 1`, [String(siteId), String(visitorId)])
+      : await pgq(`DELETE FROM "${t}" WHERE site_id = ? RETURNING 1`, [String(siteId)])
+    deleted[t] = Array.isArray(rows) ? rows.length : 0
+  }
+  return deleted
+}
+
+route.options('/api/sites/{siteId}/data', () => new Response(null, { status: 204, headers: CORS }))
+
+// Wipe all analytics data for a site (keeps the site and its goals config).
+route.delete('/api/sites/{siteId}/data', async (request: any) => {
+  const siteId = request.params.siteId
+  const denied = await requireSiteOwner(request, siteId)
+  if (denied)
+    return denied
+  const deleted = await eraseRows(siteId)
+  return json({ ok: true, deleted })
+}).middleware('auth').skipCsrf()
+
+route.options('/api/sites/{siteId}/visitors/{visitorId}', () => new Response(null, { status: 204, headers: CORS }))
+
+// GDPR erasure for a single visitor id. The id is a 24h-rotating per-site hash,
+// so this covers the rows sharing it (in practice one UTC day) — there is no
+// durable key that could reach further back, by design.
+route.delete('/api/sites/{siteId}/visitors/{visitorId}', async (request: any) => {
+  const siteId = request.params.siteId
+  const visitorId = request.params.visitorId
+  const denied = await requireSiteOwner(request, siteId)
+  if (denied)
+    return denied
+  const deleted = await eraseRows(siteId, visitorId)
+  return json({
+    ok: true,
+    visitor_id: String(visitorId),
+    deleted,
+    note: 'visitor_id is a 24h-rotating hash; erasure reaches only rows sharing it (typically one UTC day).',
+  })
+}).middleware('auth').skipCsrf()
+
 route.get('/api/sites/{siteId}/stats', async (request: any) => {
   const siteId = request.params.siteId
   const denied = await requireSiteOwner(request, siteId)
