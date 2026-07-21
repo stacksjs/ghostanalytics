@@ -19,7 +19,7 @@
     "url": "https://github.com/stacksjs/stacks/issues"
   },
   "scripts": {
-    "build:reset": "rm -rf node_modules pantry.lock && pantry install && ./buddy generate:types && ./buddy lint:fix",
+    "build:reset": "rm -rf node_modules pantry.lock && pantry install && ./buddy generate:types && ./buddy lint:fix && cd storage/framework && bun run build && cd ../../",
     "buddy": "./buddy",
     "stacks": "./buddy",
     "setup": "./bootstrap",
@@ -74,7 +74,7 @@
   },
   "dependencies": {
     "@ts-analytics/tracking": "^0.1.7",
-    "stacks": "^0.70.145"
+    "stacks": "^0.70.77"
   },
   "devDependencies": {
     "better-dx": "^0.2.15"
