@@ -81,6 +81,30 @@ export function retentionCutoff(days: number, now: Date = new Date()): string | 
   return isoStamp(new Date(now.getTime() - days * 86_400_000))
 }
 
+/**
+ * The current N-day window and the immediately-preceding N-day window, as ISO
+ * bounds — for a digest that reports a period and its change vs. the one before.
+ */
+export function periodWindows(days: number, now: Date = new Date()): {
+  curFrom: string
+  curTo: string
+  prevFrom: string
+  prevTo: string
+} {
+  const span = days * 86_400_000
+  const to = now
+  const from = new Date(to.getTime() - span)
+  const prevFrom = new Date(from.getTime() - span)
+  return { curFrom: isoStamp(from), curTo: isoStamp(to), prevFrom: isoStamp(prevFrom), prevTo: isoStamp(from) }
+}
+
+/** Percent change from `prev` to `cur`, rounded; null when there's no baseline. */
+export function pctChange(cur: number, prev: number): number | null {
+  if (!prev)
+    return null
+  return Math.round(((cur - prev) / prev) * 100)
+}
+
 /** Verify a ghostanalytics site exists; exit if not. Returns its row. */
 export async function requireSite(sql: Bun.SQL, siteId: string): Promise<{ id: string, name: string, owner_id: number | null }> {
   const rows = await sql`SELECT id, name, owner_id FROM sites WHERE id = ${siteId} LIMIT 1`
