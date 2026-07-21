@@ -34,29 +34,31 @@ async function upgrade() {
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/marketing.css">
 
 <style>
-:root { --bg:#fbfbfc; --panel:#ffffff; --border:rgba(15,23,42,0.08); --text:#0b1220; --text-2:#4b5563; --text-3:#98a2b3; --accent:#059669; --sans:'Geist', ui-sans-serif, system-ui, sans-serif; }
-@media (prefers-color-scheme: dark) { :root { --bg:#080b12; --panel:#0f131c; --border:rgba(148,163,184,0.12); --text:#f2f5f9; --text-2:#b0b9c8; --text-3:#667085; --accent:#34d399; } }
-:root[data-theme="dark"] { --bg:#080b12; --panel:#0f131c; --border:rgba(148,163,184,0.12); --text:#f2f5f9; --text-2:#b0b9c8; --text-3:#667085; --accent:#34d399; }
-:root[data-theme="light"] { --bg:#fbfbfc; --panel:#ffffff; --border:rgba(15,23,42,0.08); --text:#0b1220; --text-2:#4b5563; --text-3:#98a2b3; --accent:#059669; }
+/* Dark by default to match the always-dark marketing site + shared nav/footer. */
+:root { --bg:#0a0c0e; --panel:#101317; --border:rgba(233,238,240,0.12); --text:#eef2f3; --text-2:#9aa4a9; --text-3:#6d777c; --accent:#46d3c0; --accent-ink:#04201c; --sans:'Geist', ui-sans-serif, system-ui, sans-serif; }
+:root[data-theme="light"] { --bg:#fbfbfc; --panel:#ffffff; --border:rgba(15,23,42,0.08); --text:#0b1220; --text-2:#4b5563; --text-3:#98a2b3; --accent:#059669; --accent-ink:#ffffff; }
 body { background: var(--bg); color: var(--text); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
 .wordmark { font-weight: 700; letter-spacing: -0.03em; }
 .card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; }
 .card-pro { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); box-shadow: 0 12px 40px color-mix(in srgb, var(--accent) 12%, transparent); }
 .btn { border-radius: 10px; transition: transform .12s ease, opacity .15s ease; font-weight: 600; }
 .btn:active { transform: translateY(1px); }
-.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary { background: var(--accent); color: var(--accent-ink); }
 .btn-primary:disabled { opacity: .6; cursor: default; }
 .btn-ghost { border: 1px solid var(--border); color: var(--text-2); }
 .check { color: var(--accent); }
 .seg { border: 1px solid var(--border); border-radius: 999px; }
 .seg button { border-radius: 999px; cursor: pointer; background: transparent; color: var(--text-2); border: none; }
-.seg button.on { background: var(--accent); color: #fff; }
+.seg button.on { background: var(--accent); color: var(--accent-ink); }
 .err { color: #ef4444; }
 </style>
 
-<div class="px-5 py-14 md:px-10 min-h-[100dvh]">
+@include('site-nav')
+
+<div class="px-5 py-14 md:px-10">
   <div class="mx-auto max-w-3xl">
     <header class="mb-10 text-center">
       <a href="/" class="text-2xl wordmark">ghostanalytics</a>
@@ -71,7 +73,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
     <div class="grid gap-5 md:grid-cols-2">
       <div class="p-7 card">
         <div class="font-semibold text-sm tracking-wider uppercase" style="color: var(--text-3)">Free</div>
-        <div class="mt-3"><span class="text-4xl wordmark">\$0</span><span class="text-sm" style="color: var(--text-3)"> / forever</span></div>
+        <div class="mt-3"><span class="text-4xl wordmark">$0</span><span class="text-sm" style="color: var(--text-3)"> / forever</span></div>
         <p class="mt-2 text-sm" style="color: var(--text-2)">Everything you need to get started.</p>
         <ul class="mt-6 space-y-2.5 text-sm">
           <li class="flex gap-2 items-center"><span class="check">✓</span> 1 site</li>
@@ -103,3 +105,5 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
     <p class="mt-10 text-center text-xs" style="color: var(--text-3)">Prefer to self-host? ghostanalytics is open source and free to run yourself.</p>
   </div>
 </div>
+
+@include('site-footer')

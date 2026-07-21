@@ -15,7 +15,7 @@
     <main>
       <nav class="shell subnav" aria-label="Breadcrumb">
         <a href="/">Home</a><span class="sep">/</span>
-        <a href="/#features">Features</a><span class="sep">/</span>
+        <a href="/features" data-no-router>Features</a><span class="sep">/</span>
         <span>Core Web Vitals</span>
       </nav>
 
@@ -126,14 +126,6 @@
       </section>
     </main>
 
-    <footer class="footer shell">
-      <div class="footer-bottom" style="border-top: none">
-        <a class="brand" href="/" aria-label="ghostanalytics home">
-          <span class="brand-mark">g</span>
-          <span class="brand-name">ghostanalytics</span>
-        </a>
-        <span>No cookies. No personal data. Powered by Stacks and PostgreSQL.</span>
-      </div>
-    </footer>
+    @include('site-footer')
   </body>
 </html>

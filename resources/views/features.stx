@@ -1,0 +1,116 @@
+<script server>
+// Features landing. Bento of all seven feature areas, each linking to its
+// dedicated page. Import from GA lives in the migrate strip below the grid.
+const featureCells = [
+  { slug: 'real-time', cls: 'cell lead', title: 'Real-time visitors', body: 'See who is on your site right now, which pages they are reading, and where they arrived from. Updated live, with no refresh.', spark: true },
+  { slug: 'privacy', cls: 'cell b tint', title: 'Privacy by design', body: 'No cookies, no local storage, no consent banner, and no personal data. There is nothing to leak, sell, or hand over.' },
+  { slug: 'metrics', cls: 'cell c', title: 'Pageviews, sessions and bounce', body: 'Every hit rolls up into sessions with entry and exit paths, duration, and bounce rate. Exact, never sampled.' },
+  { slug: 'sources', cls: 'cell d', title: 'Sources and referrers', body: 'Search, social, and direct, classified automatically.' },
+  { slug: 'goals', cls: 'cell e tint', title: 'Goals and events', body: 'One-line conversions with UTM campaigns carried through.' },
+  { slug: 'geography', cls: 'cell f', title: 'Geography and devices', body: 'Country, device, browser, and OS, resolved at the edge.' },
+  { slug: 'web-vitals', cls: 'cell', style: 'grid-column: 1 / -1', title: 'Core Web Vitals, beside your traffic', body: 'Real-user LCP, INP, and CLS sit next to your visitor numbers, so a page that turns slow shows up before it quietly costs you readers.' },
+]
+
+// lead-cell sparkline (real data viz, not decoration)
+const spark = [12, 18, 15, 24, 20, 30, 27, 36, 33, 42]
+const sparkMax = Math.max(...spark)
+const leadPoints = spark
+  .map((v, i) => `${+(i * (220 / (spark.length - 1))).toFixed(1)},${+(44 - (v / sparkMax) * 40).toFixed(1)}`)
+  .join(' ')
+
+const promises = [
+  { h: 'Exact, never sampled', b: 'Every event is counted. No sampling, no thresholds, and no "data not available" once your traffic grows.' },
+  { h: 'Under 2 KB, loaded once', b: 'A single deferred first-party script. No gtag.js weight, no render blocking, no third-party fetch storm.' },
+  { h: 'Your data, your database', b: 'Every event lands in a PostgreSQL database you control. It is never shared with an ad network.' },
+]
+</script>
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Features - ghostanalytics</title>
+    <meta name="description" content="Every ghostanalytics feature in one place: real-time visitors, pageviews and sessions, sources, goals and events, geography and devices, Core Web Vitals, and privacy by design. Cookieless and exact.">
+    <meta name="theme-color" content="#0a0c0e">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap">
+    <link rel="stylesheet" href="/marketing.css">
+  </head>
+  <body>
+    @include('site-nav')
+
+    <main>
+      <nav class="shell subnav" aria-label="Breadcrumb">
+        <a href="/">Home</a><span class="sep">/</span>
+        <span>Features</span>
+      </nav>
+
+      <section class="feat-hero shell">
+        <span class="kicker">Features</span>
+        <h1>Every report you actually open. None of the tracking.</h1>
+        <p>Real-time visitors, traffic sources, conversions, and Core Web Vitals, in one screen. All from a single cookieless script under 2 KB, with exact numbers and no consent banner in the way.</p>
+        <div class="hero-actions">
+          <a class="btn primary" href="/#install">Get your script tag</a>
+          <a class="btn ghost" href="/dashboard" data-no-router>See a live dashboard</a>
+        </div>
+      </section>
+
+      <section class="reveal section shell" aria-labelledby="grid-heading">
+        <div class="section-head">
+          <h2 id="grid-heading" class="section-title">Everything ghostanalytics measures.</h2>
+        </div>
+        <div class="bento">
+          @foreach (featureCells as cell)
+            <a class="{{ cell.cls }}" href="/features/{{ cell.slug }}" data-no-router style="{{ cell.style || '' }}">
+              <h3>{{ cell.title }}</h3>
+              <p>{{ cell.body }}</p>
+              @if (cell.spark)
+                <div class="lead-spark" aria-hidden="true">
+                  <svg viewBox="0 0 220 48" preserveAspectRatio="none" role="img" aria-label="Live visitor trend">
+                    <polyline points="{{ leadPoints }}" fill="none" stroke="#46d3c0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>
+                  </svg>
+                </div>
+              @endif
+              <span class="cell-more">View feature</span>
+            </a>
+          @endforeach
+        </div>
+      </section>
+
+      <section class="reveal section shell" aria-label="Migrate from Google Analytics">
+        <div class="migrate">
+          <p>Moving off Google Analytics? Import your GA history in one click and keep every chart you already track.</p>
+          <a class="textlink" href="/features/import" data-no-router>See the import guide</a>
+        </div>
+      </section>
+
+      <section class="reveal section shell" aria-labelledby="promise-heading">
+        <div class="section-head">
+          <h2 id="promise-heading" class="section-title">What holds true across every feature</h2>
+        </div>
+        <div class="chips">
+          @foreach (promises as p)
+            <div class="chip">
+              <h3>{{ p.h }}</h3>
+              <p>{{ p.b }}</p>
+            </div>
+          @endforeach
+        </div>
+      </section>
+
+      <section class="reveal section shell" aria-label="Get started">
+        <div class="cta-band">
+          <h2>Your numbers. Your visitors' privacy. Both intact.</h2>
+          <div class="cta-actions">
+            <a class="btn primary" href="/#install">Get your script tag</a>
+            <a class="btn ghost" href="/compare" data-no-router>Compare the alternatives</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    @include('site-footer')
+  </body>
+</html>

@@ -3,7 +3,7 @@ const appName = 'ghostanalytics'
 
 const meta = {
   title: 'ghostanalytics vs the alternatives - every option compared',
-  description: 'How ghostanalytics compares to Google Analytics, Plausible, Fathom, Simple Analytics, Umami, and Matomo. Cookieless, exact, and privacy-first by design.',
+  description: 'How ghostanalytics compares to Google Analytics, Plausible, Fathom, Simple Analytics, Umami, Matomo, Cloudflare Web Analytics, and Mixpanel. Cookieless, exact, and privacy-first by design.',
 }
 
 const alternatives = [
@@ -13,6 +13,8 @@ const alternatives = [
   { slug: 'simple-analytics', name: 'vs Simple Analytics', desc: 'Aggregate-only analytics, compared feature for feature.' },
   { slug: 'umami', name: 'vs Umami', desc: 'Open-source analytics, and where the privacy lines are drawn.' },
   { slug: 'matomo', name: 'vs Matomo', desc: 'The lighter, cookieless alternative to the classic GA replacement.' },
+  { slug: 'cloudflare', name: 'vs Cloudflare', desc: 'Cookieless like Cloudflare, but with events and data you own.' },
+  { slug: 'mixpanel', name: 'vs Mixpanel', desc: 'Privacy-first web analytics next to heavy product analytics.' },
 ]
 
 const pillars = [
@@ -65,6 +67,10 @@ const pillars = [
               <div class="r-desc">{{ a.desc }}</div>
             </a>
           @endforeach
+          <a href="/features/privacy" data-no-router>
+            <div class="r-name">Why privacy-first?</div>
+            <div class="r-desc">The cookieless model behind every one of these comparisons.</div>
+          </a>
         </div>
       </section>
 
@@ -93,14 +99,6 @@ const pillars = [
       </section>
     </main>
 
-    <footer class="footer shell">
-      <div class="footer-bottom" style="border-top: none">
-        <a class="brand" href="/" aria-label="ghostanalytics home">
-          <span class="brand-mark">g</span>
-          <span class="brand-name">{{ appName }}</span>
-        </a>
-        <span>No cookies. No personal data. Powered by Stacks and PostgreSQL.</span>
-      </div>
-    </footer>
+    @include('site-footer')
   </body>
 </html>

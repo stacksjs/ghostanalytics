@@ -12,7 +12,7 @@
 
     <div class="nav-links" aria-label="Primary navigation">
       <div class="mega">
-        <a class="mega-trigger" href="/#features" data-no-router aria-haspopup="true">Features</a>
+        <a class="mega-trigger" href="/features" data-no-router aria-haspopup="true">Features</a>
         <div class="mega-panel" role="menu" aria-label="Features">
           <a role="menuitem" href="/features/real-time" data-no-router><span class="mega-t">Real-time visitors</span><span class="mega-d">See who is on your site right now, live.</span></a>
           <a role="menuitem" href="/features/metrics" data-no-router><span class="mega-t">Pageviews &amp; sessions</span><span class="mega-d">Sessions, bounce, entry and exit paths.</span></a>

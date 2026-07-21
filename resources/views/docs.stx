@@ -97,14 +97,6 @@ fetch('https://ghostanalytics.org/api/sites/demo/stats?from=2026-07-01&amp;to=20
       </section>
     </main>
 
-    <footer class="footer shell">
-      <div class="footer-bottom" style="border-top: none">
-        <a class="brand" href="/" aria-label="ghostanalytics home">
-          <span class="brand-mark">g</span>
-          <span class="brand-name">ghostanalytics</span>
-        </a>
-        <span>No cookies. No personal data. Powered by Stacks and PostgreSQL.</span>
-      </div>
-    </footer>
+    @include('site-footer')
   </body>
 </html>

@@ -49,38 +49,6 @@ const comparison = [
   { dim: 'Weight', ga: 'About 50 KB gtag.js, often blocked', ghost: 'Under 2 KB, first-party, resilient' },
   { dim: 'Leaving', ga: 'Export is a project', ghost: 'One-click GA import, both ways' },
 ]
-
-// Footer columns are separate top-level arrays, each rendered with a single
-// @foreach. (A nested @foreach over a loop variable's property does not render
-// server-side in stx — it compiles to a client @for with no data.)
-const footerProduct = [
-  { label: 'Features', url: '#features' },
-  { label: 'Pricing', url: '/pricing', native: true },
-  { label: 'Live demo', url: '/dashboard', native: true },
-]
-const footerDevelopers = [
-  { label: 'Install guide', url: '#install' },
-  { label: 'Script and API reference', url: '/docs', native: true },
-  { label: 'Custom events', url: '#install' },
-  { label: 'Import from GA', url: '/features/import', native: true },
-  { label: 'Self-hosting', url: '/docs', native: true },
-  { label: 'GitHub', url: 'https://github.com/stacksjs/ghostanalytics', native: true },
-]
-const footerCompare = [
-  { label: 'All alternatives', url: '/compare', native: true },
-  { label: 'vs Google Analytics', url: '/compare/google-analytics', native: true },
-  { label: 'vs Plausible', url: '/compare/plausible', native: true },
-  { label: 'vs Fathom', url: '/compare/fathom', native: true },
-  { label: 'vs Simple Analytics', url: '/compare/simple-analytics', native: true },
-  { label: 'vs Umami', url: '/compare/umami', native: true },
-  { label: 'vs Matomo', url: '/compare/matomo', native: true },
-]
-const footerResources = [
-  { label: 'Documentation', url: '/docs', native: true },
-  { label: 'Privacy by design', url: '/features/privacy', native: true },
-  { label: 'Live demo', url: '/dashboard', native: true },
-  { label: 'GitHub', url: 'https://github.com/stacksjs/ghostanalytics', native: true },
-]
 </script>
 
 <script client>
@@ -283,53 +251,7 @@ function pickFramework(e) {
         </section>
       </main>
 
-      <footer class="footer shell">
-        <div class="footer-top">
-          <div class="footer-brand">
-            <a class="brand" href="/" aria-label="ghostanalytics home">
-              <span class="brand-mark">g</span>
-              <span class="brand-name">{{ appName }}</span>
-            </a>
-            <p>Privacy-first web analytics, powered by Stacks + PostgreSQL.</p>
-            <span class="footer-social">
-              <a href="https://github.com/stacksjs/ghostanalytics" target="_blank" rel="noopener" aria-label="ghostanalytics on GitHub" data-no-router>
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
-              </a>
-              <a href="https://bsky.app/profile/ghostanalytics.com" target="_blank" rel="noopener" aria-label="ghostanalytics on Bluesky" data-no-router>
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 10.8c-1.087-2.114-4.046-6.053-6.798-7.995C2.566.944 1.561 1.266.902 1.565.139 1.908 0 3.08 0 3.768c0 .69.378 5.65.624 6.479.815 2.736 3.713 3.66 6.383 3.364.136-.02.275-.038.415-.056-.138.022-.276.04-.415.056-3.912.58-7.387 2.005-2.83 7.078 5.013 5.19 6.87-1.113 7.823-4.308.953 3.195 2.05 9.271 7.733 4.308 4.267-4.308 1.172-6.498-2.74-7.078a8.741 8.741 0 0 1-.415-.056c.14.017.279.036.415.056 2.67.297 5.568-.628 6.383-3.364.246-.828.624-5.789.624-6.478 0-.69-.139-1.861-.902-2.206-.658-.298-1.664-.62-4.3 1.24C16.046 4.748 13.087 8.687 12 10.8Z"/></svg>
-              </a>
-            </span>
-          </div>
-          <div class="footer-col">
-            <h4>Product</h4>
-            @foreach (footerProduct as link)
-              <a href="{{ link.url }}" data-no-router>{{ link.label }}</a>
-            @endforeach
-          </div>
-          <div class="footer-col">
-            <h4>Developers</h4>
-            @foreach (footerDevelopers as link)
-              <a href="{{ link.url }}" data-no-router>{{ link.label }}</a>
-            @endforeach
-          </div>
-          <div class="footer-col">
-            <h4>Compare</h4>
-            @foreach (footerCompare as link)
-              <a href="{{ link.url }}" data-no-router>{{ link.label }}</a>
-            @endforeach
-          </div>
-          <div class="footer-col">
-            <h4>Resources</h4>
-            @foreach (footerResources as link)
-              <a href="{{ link.url }}" data-no-router>{{ link.label }}</a>
-            @endforeach
-          </div>
-        </div>
-        <div class="footer-bottom">
-          <span>© 2026 ghostanalytics</span>
-          <span>No cookies. No personal data. No trackers on this page either.</span>
-        </div>
-      </footer>
+      @include('site-footer')
     </div>
     <script src="/assets/scripts/site-mode.js" defer></script>
   </body>

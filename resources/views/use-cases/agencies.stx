@@ -1,12 +1,3 @@
-<script server>
-const clients = [
-  { step: 'northwind.co', n: '12,480', pct: 100 },
-  { step: 'lumen-studio.com', n: '7,920', pct: 63 },
-  { step: 'harbor-goods.shop', n: '5,140', pct: 41 },
-  { step: 'field-notes.blog', n: '3,260', pct: 26 },
-]
-</script>
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -48,16 +39,44 @@ const clients = [
             <span class="live">Client sites, visitors this month</span>
             <span class="panel-tag">Sample data</span>
           </div>
-          <div class="top-pages" style="margin-top:1.2rem;gap:0.9rem;">
-            @foreach (clients as c)
-              <div>
-                <div class="top-row" style="margin-bottom:0.4rem;">
-                  <span class="path" style="font-family:var(--sans);color:var(--ink);">{{ c.step }}</span>
-                  <span class="count">{{ c.n }}</span>
-                </div>
-                <span class="bar" style="display:block;width:100%;height:8px;"><span style="width: {{ c.pct }}%"></span></span>
-              </div>
-            @endforeach
+          <div class="chart-wrap" style="margin-top:1rem">
+            <svg class="usecase-viz" viewBox="0 0 360 300" preserveAspectRatio="xMidYMid meet" role="img" aria-label="An agency overview showing four client sites managed from one login: northwind.co 12,480, lumen-studio 7,920, harbor-goods 5,140, and field-notes 3,260 visitors this month" style="display:block;width:100%;height:auto;background:#101317;border-radius:10px">
+              <rect x="6" y="6" width="348" height="288" rx="10" fill="#15191e" stroke="rgba(233,238,240,0.09)"></rect>
+              <text x="24" y="32" fill="#6d777c" font-family="'Geist Mono',ui-monospace,monospace" font-size="11" letter-spacing="1.2">CLIENT OVERVIEW</text>
+              <circle cx="315" cy="28" r="4" fill="#46d3c0"></circle>
+              <text x="326" y="32" fill="#46d3c0" font-family="'Geist Mono',ui-monospace,monospace" font-size="11" letter-spacing="0.5">LIVE</text>
+              <text x="24" y="62" fill="#eef2f3" font-family="'Geist',sans-serif" font-size="22" font-weight="700" letter-spacing="-0.5">28,800</text>
+              <text x="112" y="62" fill="#9aa4a9" font-family="'Geist Mono',ui-monospace,monospace" font-size="10.5">visitors · this month</text>
+              <line x1="24" y1="76" x2="336" y2="76" stroke="rgba(233,238,240,0.09)"></line>
+
+              <!-- northwind.co -->
+              <rect x="24" y="90" width="150" height="94" rx="8" fill="#101317" stroke="rgba(233,238,240,0.09)"></rect>
+              <text x="38" y="114" fill="#9aa4a9" font-family="'Geist Mono',ui-monospace,monospace" font-size="9.5">northwind.co</text>
+              <text x="38" y="140" fill="#eef2f3" font-family="'Geist',sans-serif" font-size="16" font-weight="700">12,480</text>
+              <polyline points="38,168 58,162 78,164 98,154 118,158 138,146 160,150" fill="none" stroke="#46d3c0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>
+              <circle cx="160" cy="150" r="3" fill="#46d3c0"></circle>
+
+              <!-- lumen-studio -->
+              <rect x="186" y="90" width="150" height="94" rx="8" fill="#101317" stroke="rgba(233,238,240,0.09)"></rect>
+              <text x="200" y="114" fill="#9aa4a9" font-family="'Geist Mono',ui-monospace,monospace" font-size="9.5">lumen-studio</text>
+              <text x="200" y="140" fill="#eef2f3" font-family="'Geist',sans-serif" font-size="16" font-weight="700">7,920</text>
+              <polyline points="200,166 220,160 240,162 260,150 280,156 300,148 322,140" fill="none" stroke="#46d3c0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>
+              <circle cx="322" cy="140" r="3" fill="#46d3c0"></circle>
+
+              <!-- harbor-goods -->
+              <rect x="24" y="192" width="150" height="94" rx="8" fill="#101317" stroke="rgba(233,238,240,0.09)"></rect>
+              <text x="38" y="216" fill="#9aa4a9" font-family="'Geist Mono',ui-monospace,monospace" font-size="9.5">harbor-goods</text>
+              <text x="38" y="242" fill="#eef2f3" font-family="'Geist',sans-serif" font-size="16" font-weight="700">5,140</text>
+              <polyline points="38,270 58,266 78,268 98,258 118,262 138,256 160,252" fill="none" stroke="#46d3c0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>
+              <circle cx="160" cy="252" r="3" fill="#46d3c0"></circle>
+
+              <!-- field-notes -->
+              <rect x="186" y="192" width="150" height="94" rx="8" fill="#101317" stroke="rgba(233,238,240,0.09)"></rect>
+              <text x="200" y="216" fill="#9aa4a9" font-family="'Geist Mono',ui-monospace,monospace" font-size="9.5">field-notes</text>
+              <text x="200" y="242" fill="#eef2f3" font-family="'Geist',sans-serif" font-size="16" font-weight="700">3,260</text>
+              <polyline points="200,268 220,270 240,260 260,264 280,258 300,262 322,256" fill="none" stroke="#46d3c0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>
+              <circle cx="322" cy="256" r="3" fill="#46d3c0"></circle>
+            </svg>
           </div>
         </aside>
       </section>
@@ -141,14 +160,6 @@ const clients = [
       </section>
     </main>
 
-    <footer class="footer shell">
-      <div class="footer-bottom" style="border-top: none">
-        <a class="brand" href="/" aria-label="ghostanalytics home">
-          <span class="brand-mark">g</span>
-          <span class="brand-name">ghostanalytics</span>
-        </a>
-        <span>No cookies. No personal data. Powered by Stacks and PostgreSQL.</span>
-      </div>
-    </footer>
+    @include('site-footer')
   </body>
 </html>

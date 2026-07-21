@@ -1,0 +1,150 @@
+<script server>
+const appName = 'ghostanalytics'
+
+const meta = {
+  title: 'ghostanalytics vs Cloudflare Web Analytics - the privacy-first alternative',
+  description: 'Cloudflare Web Analytics is free and cookieless, but read-only on pageviews and locked to Cloudflare. ghostanalytics adds custom events, data you own in PostgreSQL, and self-hosting, while staying cookieless.',
+}
+
+// dim / competitor / ghostanalytics — reuses the home comparison grid styling.
+const rows = [
+  { dim: 'Cookies and consent', them: 'Cookieless, no banner. A genuine privacy peer.', us: 'Cookieless, no banner, no personal data stored.' },
+  { dim: 'Custom events and goals', them: 'None. Pageviews, referrers, and top paths only.', us: 'One-line ghost() events, goals, and UTM campaigns.' },
+  { dim: 'Where your data lives', them: 'Inside Cloudflare. You read it, you do not hold it.', us: 'Your own PostgreSQL database, and nowhere else.' },
+  { dim: 'Open source and self-host', them: 'Proprietary and hosted. No self-host option.', us: 'MIT-licensed and self-hostable on your own box.' },
+  { dim: 'Ties to one provider', them: 'At its best when your site is proxied through Cloudflare.', us: 'Works on any host or CDN with one script tag.' },
+  { dim: 'Real-time', them: 'Reports refresh on a delay, not live.', us: 'A live view of who is on the site right now.' },
+  { dim: 'Price', them: 'Free.', us: 'Free tier, flat Pro, and free forever if you self-host.' },
+]
+
+const reasons = [
+  { n: '01', h: 'Events, not just a pageview counter', b: 'Cloudflare Web Analytics counts pages and referrers and stops there. ghostanalytics fires a conversion with a one-line ghost() call, so signups, purchases, and custom events sit beside your traffic.' },
+  { n: '02', h: 'You hold the data, not just a dashboard', b: 'Cloudflare shows you the numbers but keeps them. With ghostanalytics every raw event lands in a PostgreSQL database you own, ready to query, export, or self-host.' },
+  { n: '03', h: 'Not tied to one network', b: 'Cloudflare Analytics is happiest when your site already runs behind Cloudflare. ghostanalytics is a single first-party script that works on any host, CDN, or framework.' },
+]
+
+const metrics = [
+  { v: 'Cookieless', l: 'Like Cloudflare, no cookies and no consent banner. Where ghostanalytics goes further is events and ownership.' },
+  { v: 'Your DB', l: 'Every event stored in your own PostgreSQL, not held inside a provider dashboard.' },
+  { v: 'Any host', l: 'One script tag, no requirement to proxy your traffic through a specific network.' },
+]
+
+const related = [
+  { slug: 'plausible', name: 'vs Plausible', desc: 'Two cookieless tools, side by side.' },
+  { slug: 'simple-analytics', name: 'vs Simple Analytics', desc: 'Aggregate-only analytics, compared.' },
+  { slug: '', name: 'All alternatives', desc: 'Every analytics alternative, compared.' },
+]
+</script>
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ meta.title }}</title>
+    <meta name="description" content="{{ meta.description }}">
+    <meta name="theme-color" content="#0a0c0e">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap">
+    <link rel="stylesheet" href="/marketing.css">
+  </head>
+  <body>
+    @include('site-nav')
+
+    <main>
+      <nav class="shell subnav" aria-label="Breadcrumb">
+        <a href="/">Home</a><span class="sep">/</span>
+        <a href="/compare" data-no-router>Compare</a><span class="sep">/</span>
+        <span>Cloudflare</span>
+      </nav>
+
+      <section class="feat-hero shell">
+        <span class="kicker">ghostanalytics vs Cloudflare Web Analytics</span>
+        <h1>Cookieless like Cloudflare, but the data is yours.</h1>
+        <p>Cloudflare Web Analytics is a solid free pageview counter, and like ghostanalytics it sets no cookies. The difference is depth and ownership: ghostanalytics adds custom events and goals, stores every event in your own PostgreSQL, and runs on any host, not just behind Cloudflare.</p>
+        <div class="hero-actions">
+          <a class="btn primary" href="/#install">Get your script tag</a>
+          <a class="btn ghost" href="/features/goals" data-no-router>See events and goals</a>
+        </div>
+      </section>
+
+      <section class="reveal section shell" aria-labelledby="cmp-heading">
+        <div class="section-head">
+          <p class="eyebrow">Cloudflare vs ghostanalytics</p>
+          <h2 id="cmp-heading" class="section-title">Point for point.</h2>
+        </div>
+        <div class="cmp">
+          @foreach (rows as row)
+            <div class="cmp-cell">
+              <span class="cmp-dim">{{ row.dim }}</span>
+              <span class="cmp-ga">{{ row.them }}</span>
+              <span class="cmp-ghost">{{ row.us }}</span>
+            </div>
+          @endforeach
+        </div>
+      </section>
+
+      <section class="reveal section shell" aria-label="Where Cloudflare leads">
+        <div class="migrate">
+          <p>Where Cloudflare leads: it is genuinely free, and if your site already runs behind Cloudflare it is zero extra script and zero config. For a no-frills pageview count with nothing to manage, it is hard to beat on price.</p>
+          <a class="textlink" href="/pricing" data-no-router>See how our pricing works</a>
+        </div>
+      </section>
+
+      <section class="reveal section shell" aria-labelledby="why-heading">
+        <div class="section-head">
+          <h2 id="why-heading" class="section-title">Why teams switch from Cloudflare.</h2>
+        </div>
+        <div class="flow">
+          @foreach (reasons as step)
+            <div class="flow-step">
+              <span class="flow-num">{{ step.n }}</span>
+              <div>
+                <h3>{{ step.h }}</h3>
+                <p>{{ step.b }}</p>
+              </div>
+            </div>
+          @endforeach
+        </div>
+      </section>
+
+      <section class="reveal section shell" aria-label="At a glance">
+        <div class="metrics">
+          @foreach (metrics as m)
+            <div class="metric">
+              <div class="m-value">{{ m.v }}</div>
+              <div class="m-label">{{ m.l }}</div>
+            </div>
+          @endforeach
+        </div>
+      </section>
+
+      <section class="reveal section shell" aria-labelledby="related-heading">
+        <div class="section-head">
+          <h2 id="related-heading" class="section-title">Keep comparing</h2>
+        </div>
+        <div class="related">
+          @foreach (related as r)
+            <a href="/compare/{{ r.slug }}" data-no-router>
+              <div class="r-name">{{ r.name }}</div>
+              <div class="r-desc">{{ r.desc }}</div>
+            </a>
+          @endforeach
+        </div>
+      </section>
+
+      <section class="reveal section shell" aria-label="Get started">
+        <div class="cta-band">
+          <h2>Keep the privacy. Add the events, and the ownership.</h2>
+          <div class="cta-actions">
+            <a class="btn primary" href="/#install">Get your script tag</a>
+            <a class="btn ghost" href="/dashboard" data-no-router>See a live dashboard</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    @include('site-footer')
+  </body>
+</html>
