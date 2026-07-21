@@ -800,6 +800,10 @@ const isPro = state(false)
 const shareUrl = state(shareToken ? `${window.location.origin}/dashboard?site=${encodeURIComponent(activeSiteId)}&share=${shareToken}` : '')
 const shareBusy = state(false)
 const shareCopied = state(false)
+// Live "current visitors": seeded from the server render, then polled so the
+// count stays fresh without a reload (issue #20). liveNow is bridged from the
+// server block; the poll stops on 401 (a share viewer has no owner token).
+const liveCount = state(typeof liveNow === 'number' ? liveNow : 0)
 
 function authHeaders(json) {
   const h = { Authorization: `Bearer ${localStorage.getItem('token') || ''}` }
@@ -980,6 +984,19 @@ onMount(() => {
     .then(r => r.ok ? r.json() : null)
     .then(d => { if (d && d.pro) isPro.set(true) })
     .catch(() => {})
+
+  // Refresh the live visitor count every 15s. Stop on 401 (share viewers can't
+  // read it) so we don't poll forever with no token.
+  let liveTimer
+  const tick = () => fetch(`/api/sites/${encodeURIComponent(activeSiteId)}/realtime`, { headers: authHeaders(false) })
+    .then((r) => {
+      if (r.status === 401) { clearInterval(liveTimer); return null }
+      return r.ok ? r.json() : null
+    })
+    .then((d) => { if (d && typeof d.current === 'number') liveCount.set(d.current) })
+    .catch(() => {})
+  liveTimer = setInterval(tick, 15000)
+  return () => clearInterval(liveTimer)
 })
 </script>
 
@@ -1097,9 +1114,9 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
           </div>
         @endif
         <div class="inline-flex gap-2 items-center mt-3 px-2.5 py-1 border pill reveal border-border">
-          <span class="{{ liveNow ? 'live-dot' : '' }}" style="position: relative; display: inline-block; width: 7px; height: 7px; border-radius: 999px; background: {{ liveNow ? 'var(--accent)' : 'var(--text-3)' }};"></span>
-          <span class="font-semibold text-xs mono" style="color: {{ liveNow ? 'var(--text)' : 'var(--text-3)' }}">{{ liveNow }}</span>
-          <span class="text-xs text-text-3">current {{ liveNow === 1 ? 'visitor' : 'visitors' }}</span>
+          <span :class="liveCount() ? 'live-dot' : ''" :style="`position: relative; display: inline-block; width: 7px; height: 7px; border-radius: 999px; background: ${liveCount() ? 'var(--accent)' : 'var(--text-3)'};`"></span>
+          <span class="font-semibold text-xs mono" :style="`color: ${liveCount() ? 'var(--text)' : 'var(--text-3)'}`">{{ liveCount() }}</span>
+          <span class="text-xs text-text-3">current {{ liveCount() === 1 ? 'visitor' : 'visitors' }}</span>
         </div>
       </div>
       <nav class="flex gap-1.5 items-center">

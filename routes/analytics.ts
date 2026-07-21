@@ -806,6 +806,21 @@ route.get('/api/sites/{siteId}/exit-pages', async (request: any) => {
   return json({ exit_pages: rows ?? [] })
 }).middleware('auth')
 
+// Current visitors: unique visitors in the last ~5 minutes. Polled by the
+// dashboard to keep the live count fresh without a reload (issue #20).
+route.get('/api/sites/{siteId}/realtime', async (request: any) => {
+  const siteId = request.params.siteId
+  const denied = await requireSiteOwner(request, siteId)
+  if (denied)
+    return denied
+  const since = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+  const row = (await pgq(
+    `SELECT COUNT(DISTINCT visitor_id) AS current FROM page_views WHERE site_id = ? AND timestamp >= ?`,
+    [siteId, since],
+  ))?.[0]
+  return json({ current: Number(row?.current ?? 0) })
+}).middleware('auth')
+
 // ---------------------------------------------------------------------------
 // Tracker script + health
 // ---------------------------------------------------------------------------
