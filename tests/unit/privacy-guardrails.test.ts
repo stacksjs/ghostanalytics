@@ -36,6 +36,21 @@ describe('guardrail: country-only geolocation', () => {
     expect(analytics).not.toMatch(/^\s*city\s*:/m)
     expect(analytics).not.toMatch(/^\s*region\s*:/m)
   })
+
+  test('the schema and models carry no city/region columns', () => {
+    // The columns were removed (issue #7) so the sub-country capability cannot be
+    // quietly switched on. Re-adding a region/city column trips this guardrail.
+    const files = [
+      'database/migrations/0000000003-create-page_views-table.sql',
+      'database/migrations/0000000005-create-sessions-table.sql',
+      'app/Models/PageView.ts',
+      'app/Models/Session.ts',
+    ]
+    for (const f of files) {
+      const src = read(f)
+      expect(src).not.toMatch(/["\s](city|region)["\s]*(varchar|:)/i)
+    }
+  })
 })
 
 describe('guardrail: no individual-tracking dependencies', () => {

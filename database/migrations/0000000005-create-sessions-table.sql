@@ -10,8 +10,6 @@ CREATE TABLE IF NOT EXISTS "sessions" (
   "utm_medium" varchar(64),
   "utm_campaign" varchar(128),
   "country" varchar(2),
-  "region" varchar(64),
-  "city" varchar(128),
   "device_type" varchar(16),
   "browser" varchar(32),
   "os" varchar(32),

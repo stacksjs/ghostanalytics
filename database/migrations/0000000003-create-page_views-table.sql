@@ -14,8 +14,6 @@ CREATE TABLE IF NOT EXISTS "page_views" (
   "utm_content" varchar(255),
   "utm_term" varchar(255),
   "country" varchar(2),
-  "region" varchar(64),
-  "city" varchar(128),
   "device_type" varchar(16),
   "browser" varchar(32),
   "browser_version" varchar(32),

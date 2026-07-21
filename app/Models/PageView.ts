@@ -58,8 +58,6 @@ export default defineModel({
     utm_content: { fillable: true, validation: { rule: schema.string().optional().max(255) } },
     utm_term: { fillable: true, validation: { rule: schema.string().optional().max(255) } },
     country: { fillable: true, validation: { rule: schema.string().optional().max(2) } },
-    region: { fillable: true, validation: { rule: schema.string().optional().max(64) } },
-    city: { fillable: true, validation: { rule: schema.string().optional().max(128) } },
     device_type: { fillable: true, validation: { rule: schema.string().optional().max(16) } },
     browser: { fillable: true, validation: { rule: schema.string().optional().max(32) } },
     browser_version: { fillable: true, validation: { rule: schema.string().optional().max(32) } },
