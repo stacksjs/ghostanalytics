@@ -16,14 +16,26 @@ const range = query.get('range') || '1y'
 // are `now - days`. These are `let` because the 'all' span — and the chart bucket
 // granularity derived from it — are only known once we query MIN(timestamp).
 const isAll = range === 'all'
+// Custom range: explicit ?from=YYYY-MM-DD&to=YYYY-MM-DD (both required, valid).
+// Takes precedence over the preset; the picker below submits these.
+const qFrom = query.get('from')
+const qTo = query.get('to')
+const isDate = s => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}/.test(s)
+const isCustom = !isAll && isDate(qFrom) && isDate(qTo)
+const customFrom = isCustom ? String(qFrom).slice(0, 10) : ''
+const customTo = isCustom ? String(qTo).slice(0, 10) : ''
 let days = range === '24h' ? 1 : range === '30d' ? 30 : range === '90d' ? 90 : range === '1y' ? 365 : range === '7d' ? 7 : 365
-const to = new Date().toISOString()
-let from = isAll ? '2000-01-01T00:00:00.000Z' : new Date(Date.now() - days * 864e5).toISOString()
+const to = isCustom ? `${customTo}T23:59:59.999Z` : new Date().toISOString()
+let from = isAll
+  ? '2000-01-01T00:00:00.000Z'
+  : isCustom ? `${customFrom}T00:00:00.000Z` : new Date(Date.now() - days * 864e5).toISOString()
+if (isCustom)
+  days = Math.max(1, Math.round((new Date(to).getTime() - new Date(from).getTime()) / 864e5))
 // Chart bucket granularity by span: hour (<= 2d) for a real 24h curve, day (<= ~400d),
 // or month (wider, e.g. all-time) so a multi-year chart isn't thousands of points.
 // bucketLen = the LEFT(timestamp, N) prefix — 'YYYY-MM-DDTHH'(13) / 'YYYY-MM-DD'(10) /
 // 'YYYY-MM'(7). String-prefix bucketing (no date math) stays dialect-portable.
-let granularity = days <= 2 ? 'hour' : 'day'
+let granularity = days <= 2 ? 'hour' : days > 400 ? 'month' : 'day'
 let hourly = granularity === 'hour'
 let bucketLen = granularity === 'hour' ? 13 : granularity === 'month' ? 7 : 10
 // Per-site timezone: the chart buckets in the site's local time (default UTC).
@@ -1094,8 +1106,21 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
         @foreach (ranges as r)
           <a href="?site={{ siteId }}&range={{ r.key }}{{ compare ? '&compare=1' : '' }}"
             class="px-3.5 py-1.5 font-medium text-sm border pill"
-            style="{{ r.key === range ? 'color: #fff; background: var(--accent); border-color: var(--accent)' : 'color: var(--text-2); border-color: var(--border)' }}">{{ r.label }}</a>
+            style="{{ !isCustom && r.key === range ? 'color: #fff; background: var(--accent); border-color: var(--accent)' : 'color: var(--text-2); border-color: var(--border)' }}">{{ r.label }}</a>
         @endforeach
+        <form method="get" class="inline-flex gap-1.5 items-center" title="Custom date range">
+          <input type="hidden" name="site" value="{{ siteId }}">
+          @if (compare)
+            <input type="hidden" name="compare" value="1">
+          @endif
+          <input type="date" name="from" value="{{ customFrom }}" aria-label="From date"
+            class="px-2 py-1.5 text-sm border pill" style="color: var(--text-2); border-color: var(--border); background: var(--panel);">
+          <span class="text-xs text-text-3">to</span>
+          <input type="date" name="to" value="{{ customTo }}" aria-label="To date"
+            class="px-2 py-1.5 text-sm border pill" style="color: var(--text-2); border-color: var(--border); background: var(--panel);">
+          <button type="submit" class="px-3.5 py-1.5 font-medium text-sm border pill"
+            style="{{ isCustom ? 'color: #fff; background: var(--accent); border-color: var(--accent)' : 'color: var(--text-2); border-color: var(--border); background: var(--panel);' }} cursor: pointer;">Apply</button>
+        </form>
         <a href="{{ compareToggleUrl() }}" title="Overlay the previous period on the chart"
           class="px-3.5 py-1.5 font-medium text-sm border pill"
           style="{{ isAll ? 'display:none' : (compare ? 'color: #fff; background: var(--accent); border-color: var(--accent)' : 'color: var(--text-2); border-color: var(--border)') }}">Compare</a>
