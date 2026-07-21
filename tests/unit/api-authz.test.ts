@@ -46,8 +46,14 @@ const DELETE_DECLS = [
   'route.delete(\'/api/sites/{siteId}/visitors/{visitorId}\'',
 ]
 
-describe('guardrail: data-erasure endpoints are owner-gated', () => {
-  for (const decl of DELETE_DECLS) {
+// Site management (rename/edit + cascade delete) mutates owner data too.
+const MGMT_DECLS = [
+  'route.patch(\'/api/sites/{siteId}\'',
+  'route.delete(\'/api/sites/{siteId}\'',
+]
+
+describe('guardrail: owner-gated mutation endpoints', () => {
+  for (const decl of [...DELETE_DECLS, ...MGMT_DECLS]) {
     test(`${decl.slice(12)} enforces auth + site ownership`, () => {
       const i = analytics.indexOf(decl)
       expect(i).toBeGreaterThan(-1)

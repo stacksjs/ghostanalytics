@@ -408,6 +408,76 @@ route.post('/api/sites', async (request: any) => {
   return json({ site: { id, name, domains, owner_id: Number(uid) } }, 201)
 }).middleware('auth').skipCsrf()
 
+/** True when `tz` is an IANA time zone the runtime accepts (for per-site tz). */
+function isValidTimeZone(tz: string): boolean {
+  try {
+    // eslint-disable-next-line no-new
+    new Intl.DateTimeFormat('en-US', { timeZone: tz })
+    return true
+  }
+  catch {
+    return false
+  }
+}
+
+route.options('/api/sites/{siteId}', () => new Response(null, { status: 204, headers: CORS }))
+
+// Rename / edit a site (name, domains, timezone). Owner-scoped, partial update.
+route.patch('/api/sites/{siteId}', async (request: any) => {
+  const siteId = request.params.siteId
+  const denied = await requireSiteOwner(request, siteId)
+  if (denied)
+    return denied
+
+  const body = request.jsonBody ?? {}
+  const sets: string[] = []
+  const params: unknown[] = []
+
+  if (typeof body.name === 'string') {
+    const name = body.name.trim().slice(0, 255)
+    if (!name)
+      return json({ error: 'name cannot be empty' }, 400)
+    sets.push('name = ?')
+    params.push(name)
+  }
+  if (Array.isArray(body.domains)) {
+    const domains = body.domains
+      .filter((d: unknown): d is string => typeof d === 'string')
+      .map((d: string) => d.trim().slice(0, 255))
+      .filter(Boolean)
+    sets.push('domains = ?')
+    params.push(JSON.stringify(domains))
+  }
+  if (typeof body.timezone === 'string') {
+    if (!isValidTimeZone(body.timezone))
+      return json({ error: 'invalid timezone' }, 400)
+    sets.push('timezone = ?')
+    params.push(body.timezone)
+  }
+  if (!sets.length)
+    return json({ error: 'nothing to update' }, 400)
+
+  sets.push('updated_at = ?')
+  params.push(new Date().toISOString())
+  params.push(String(siteId))
+  await pgq(`UPDATE sites SET ${sets.join(', ')} WHERE id = ?`, params)
+  const rows = await pgq(`SELECT id, name, domains, timezone, is_active FROM sites WHERE id = ? LIMIT 1`, [String(siteId)])
+  return json({ site: rows?.[0] ?? null })
+}).middleware('auth').skipCsrf()
+
+// Delete a site and cascade-erase all of its data (events + goals + the row).
+route.delete('/api/sites/{siteId}', async (request: any) => {
+  const siteId = request.params.siteId
+  const denied = await requireSiteOwner(request, siteId)
+  if (denied)
+    return denied
+  const deleted = await eraseRows(siteId)
+  const goals = await pgq(`DELETE FROM goals WHERE site_id = ? RETURNING 1`, [String(siteId)])
+  deleted.goals = Array.isArray(goals) ? goals.length : 0
+  await pgq(`DELETE FROM sites WHERE id = ?`, [String(siteId)])
+  return json({ ok: true, deleted })
+}).middleware('auth').skipCsrf()
+
 // ---------------------------------------------------------------------------
 // Goals (management API)
 // ---------------------------------------------------------------------------
