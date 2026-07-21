@@ -61,6 +61,26 @@ export function isoStamp(d: Date): string {
   return d.toISOString().replace(/(\.\d{3})Z$/, '$1Z')
 }
 
+/**
+ * Days of analytics history to keep, from `GHOST_RETENTION_DAYS`. A positive
+ * integer enables retention; unset, 0, or invalid means disabled (keep forever).
+ */
+export function retentionDays(env: Record<string, string | undefined> = process.env): number {
+  const raw = Number(env.GHOST_RETENTION_DAYS ?? 0)
+  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 0
+}
+
+/**
+ * ISO cutoff for the retention window: rows whose (ISO, lexically-sortable)
+ * timestamp is strictly older than this are eligible for pruning. Returns null
+ * when retention is disabled (`days <= 0`).
+ */
+export function retentionCutoff(days: number, now: Date = new Date()): string | null {
+  if (!(days > 0))
+    return null
+  return isoStamp(new Date(now.getTime() - days * 86_400_000))
+}
+
 /** Verify a ghostanalytics site exists; exit if not. Returns its row. */
 export async function requireSite(sql: Bun.SQL, siteId: string): Promise<{ id: string, name: string, owner_id: number | null }> {
   const rows = await sql`SELECT id, name, owner_id FROM sites WHERE id = ${siteId} LIMIT 1`
