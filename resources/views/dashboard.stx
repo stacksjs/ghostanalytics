@@ -26,6 +26,10 @@ let from = isAll ? '2000-01-01T00:00:00.000Z' : new Date(Date.now() - days * 864
 let granularity = days <= 2 ? 'hour' : 'day'
 let hourly = granularity === 'hour'
 let bucketLen = granularity === 'hour' ? 13 : granularity === 'month' ? 7 : 10
+// Per-site timezone: the chart buckets in the site's local time (default UTC).
+// Assigned once the active site is resolved; tzLabel is the short axis label.
+let siteTz = 'UTC'
+let tzLabel = 'UTC'
 // Last ~5 minutes; ISO string compares lexicographically against the ISO timestamp column.
 const liveFrom = new Date(Date.now() - 5 * 60 * 1000).toISOString()
 // Compare-to-previous-period overlay: ?compare=1 draws the immediately-preceding window
@@ -280,6 +284,26 @@ async function loadData() {
   // Owner (not a share viewer): surface any existing share token for the link UI.
   if (!shareMode)
     shareToken = (await readSettings(siteId)).share_token || ''
+  // Resolve the site's timezone for chart bucketing. `timestamp` is a stored UTC
+  // ISO string; for UTC keep the fast string-prefix, otherwise convert to the
+  // site's zone first. siteTz is sanitized to IANA-safe characters, so it is safe
+  // to interpolate into the query.
+  {
+    const tz = (await pgq(`SELECT timezone FROM sites WHERE id = ?`, [siteId]))?.[0]?.timezone
+    if (typeof tz === 'string' && /^[\w+\-/]{1,64}$/.test(tz) && tz !== 'UTC')
+      siteTz = tz
+  }
+  try {
+    tzLabel = siteTz === 'UTC'
+      ? 'UTC'
+      : (new Intl.DateTimeFormat('en-US', { timeZone: siteTz, timeZoneName: 'short' })
+          .formatToParts(new Date()).find(x => x.type === 'timeZoneName')?.value || siteTz)
+  }
+  catch { tzLabel = siteTz }
+  const bucketCol = siteTz === 'UTC'
+    ? 'timestamp'
+    : `to_char(timezone('${siteTz}', timestamp::timestamptz), 'YYYY-MM-DD"T"HH24:MI:SS')`
+  const bucket = len => `LEFT(${bucketCol}, ${len})`
   // 'all' range: anchor `from` at the site's earliest pageview, then pick the chart
   // granularity from the real span (month for multi-year so imported history is
   // legible). No data → default to last 30 days. prevFrom = from makes the prev
@@ -307,7 +331,7 @@ async function loadData() {
     `SELECT COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors, COUNT(DISTINCT session_id) AS sessions FROM page_views WHERE ${filter}`, p))?.[0]
   kpis = { views: Number(row?.views ?? 0), visitors: Number(row?.visitors ?? 0), sessions: Number(row?.sessions ?? 0) }
   series = (await pgq(
-    `SELECT LEFT(timestamp, ${bucketLen}) AS day, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors FROM page_views WHERE ${filter} GROUP BY LEFT(timestamp, ${bucketLen}) ORDER BY day ASC`, p)) ?? []
+    `SELECT ${bucket(bucketLen)} AS day, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors FROM page_views WHERE ${filter} GROUP BY ${bucket(bucketLen)} ORDER BY day ASC`, p)) ?? []
   // Top pages by views, each LEFT JOINed to its entry-based bounce (GA-style): of the
   // sessions that LANDED on this page, the share that bounced. The bounce subquery reuses
   // the entry-page window (rn=1 + whole-session COUNT(*) OVER) under sessionFilter, so it
@@ -407,7 +431,7 @@ async function loadData() {
   // as the current series, over [prevFrom, from). Honors the full filter (pageview count).
   if (compare) {
     prevSeries = (await pgq(
-      `SELECT LEFT(timestamp, ${bucketLen}) AS day, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors FROM page_views WHERE ${filterPrev} GROUP BY LEFT(timestamp, ${bucketLen}) ORDER BY day ASC`, pp)) ?? []
+      `SELECT ${bucket(bucketLen)} AS day, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors FROM page_views WHERE ${filterPrev} GROUP BY ${bucket(bucketLen)} ORDER BY day ASC`, pp)) ?? []
   }
   const prow = (await pgq(
     `SELECT COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors, COUNT(DISTINCT session_id) AS sessions FROM page_views WHERE ${filterPrev}`, pp))?.[0]
@@ -1218,7 +1242,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); -web
         <div class="flex justify-between mt-2 text-xs mono text-text-3">
           <span>{{ chart.firstLabel }}</span>
           @if (hourly)
-            <span style="opacity: 0.7">UTC</span>
+            <span style="opacity: 0.7">{{ tzLabel }}</span>
           @endif
           <span>{{ chart.lastLabel }}</span>
         </div>
