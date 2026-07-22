@@ -59,6 +59,43 @@ function window(req: { query: Record<string, any> }): { from: string, to: string
   return { from, to }
 }
 
+// Dimensions the Stats API can filter by, mapped to their page_views column.
+// The dashboard's click-to-filter exposes the same set. Keys are the query
+// params; columns are fixed literals (never user input), so interpolating them
+// is safe — the values are always parameterized.
+const FILTER_COLUMNS: Record<string, string> = {
+  path: 'path',
+  source: 'referrer_source',
+  referrer: 'referrer',
+  country: 'country',
+  device: 'device_type',
+  browser: 'browser',
+  os: 'os',
+  utm_source: 'utm_source',
+  utm_medium: 'utm_medium',
+  utm_campaign: 'utm_campaign',
+  utm_content: 'utm_content',
+  utm_term: 'utm_term',
+}
+
+/**
+ * Build ` AND <col> = ?` fragments + params from any filter query params present.
+ * Composes with AND, matching the dashboard's filter engine, so /pages?country=US
+ * &device=Mobile narrows a page_views report to that segment.
+ */
+function readFilters(req: { query: Record<string, any> }): { sql: string, params: unknown[] } {
+  let sql = ''
+  const params: unknown[] = []
+  for (const [key, col] of Object.entries(FILTER_COLUMNS)) {
+    const v = req.query?.[key]
+    if (typeof v === 'string' && v !== '') {
+      sql += ` AND ${col} = ?`
+      params.push(v)
+    }
+  }
+  return { sql, params }
+}
+
 /** Trim a UTM param to a non-empty varchar(255), or null when absent/blank. */
 function utmParam(v: unknown): string | null {
   if (typeof v !== 'string')
@@ -671,10 +708,11 @@ route.get('/api/sites/{siteId}/stats', async (request: any) => {
   if (denied)
     return denied
   const { from, to } = window(request)
+  const flt = readFilters(request)
   const row = (await pgq(
     `SELECT COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors, COUNT(DISTINCT session_id) AS sessions
-    FROM page_views WHERE site_id = ? AND timestamp >= ? AND timestamp <= ?`,
-    [siteId, from, to],
+    FROM page_views WHERE site_id = ? AND timestamp >= ? AND timestamp <= ?${flt.sql}`,
+    [siteId, from, to, ...flt.params],
   ))?.[0]
   return json({
     views: Number(row?.views ?? 0),
@@ -690,11 +728,12 @@ route.get('/api/sites/{siteId}/timeseries', async (request: any) => {
   if (denied)
     return denied
   const { from, to } = window(request)
+  const flt = readFilters(request)
   const rows = await pgq(
     `SELECT LEFT(timestamp, 10) AS day, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors
-    FROM page_views WHERE site_id = ? AND timestamp >= ? AND timestamp <= ?
+    FROM page_views WHERE site_id = ? AND timestamp >= ? AND timestamp <= ?${flt.sql}
     GROUP BY LEFT(timestamp, 10) ORDER BY day ASC`,
-    [siteId, from, to],
+    [siteId, from, to, ...flt.params],
   )
   return json({ series: rows ?? [] })
 }).middleware('auth')
@@ -705,11 +744,12 @@ route.get('/api/sites/{siteId}/pages', async (request: any) => {
   if (denied)
     return denied
   const { from, to } = window(request)
+  const flt = readFilters(request)
   const rows = await pgq(
     `SELECT path, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors
-    FROM page_views WHERE site_id = ? AND timestamp >= ? AND timestamp <= ?
+    FROM page_views WHERE site_id = ? AND timestamp >= ? AND timestamp <= ?${flt.sql}
     GROUP BY path ORDER BY views DESC LIMIT 20`,
-    [siteId, from, to],
+    [siteId, from, to, ...flt.params],
   )
   return json({ pages: rows ?? [] })
 }).middleware('auth')
@@ -720,11 +760,12 @@ route.get('/api/sites/{siteId}/referrers', async (request: any) => {
   if (denied)
     return denied
   const { from, to } = window(request)
+  const flt = readFilters(request)
   const rows = await pgq(
     `SELECT referrer_source AS source, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors
-    FROM page_views WHERE site_id = ? AND timestamp >= ? AND timestamp <= ?
+    FROM page_views WHERE site_id = ? AND timestamp >= ? AND timestamp <= ?${flt.sql}
     GROUP BY referrer_source ORDER BY views DESC LIMIT 20`,
-    [siteId, from, to],
+    [siteId, from, to, ...flt.params],
   )
   return json({ referrers: rows ?? [] })
 }).middleware('auth')
@@ -740,11 +781,12 @@ function topDimension(path: string, column: string, key: string): void {
     if (denied)
       return denied
     const { from, to } = window(request)
+    const flt = readFilters(request)
     const rows = await pgq(
       `SELECT ${column} AS name, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors
-      FROM page_views WHERE site_id = ? AND timestamp >= ? AND timestamp <= ? AND ${column} IS NOT NULL AND ${column} <> ''
+      FROM page_views WHERE site_id = ? AND timestamp >= ? AND timestamp <= ? AND ${column} IS NOT NULL AND ${column} <> ''${flt.sql}
       GROUP BY ${column} ORDER BY views DESC LIMIT 20`,
-      [siteId, from, to],
+      [siteId, from, to, ...flt.params],
     )
     return json({ [key]: rows ?? [] })
   }).middleware('auth')
