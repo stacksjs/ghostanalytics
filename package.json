@@ -36,6 +36,7 @@
     "export:site": "bun scripts/analytics/export-site.ts",
     "import:site": "bun scripts/analytics/import-site.ts",
     "import:fathom": "bun scripts/analytics/import-fathom.ts",
+    "import:ga": "bun scripts/analytics/import-ga.ts",
     "lint": "./buddy lint",
     "lint:fix": "./buddy lint:fix",
     "format": "./buddy format",
